@@ -1,8 +1,11 @@
 """Samjon Memory Core V1 - FastAPI application entry point."""
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from samjon_memory.config import config
 from samjon_memory.core.service import CoreService
 from samjon_memory.api.health import router as health_router
@@ -37,7 +40,21 @@ async def startup():
     app.state.service = service
 
 
-@app.get("/portal/")
+STATIC_DIR = Path(__file__).parent.parent / "portal" / "static"
+
+app.mount(
+    "/portal/static",
+    StaticFiles(directory=STATIC_DIR),
+    name="portal-static",
+)
+
+
+@app.get("/portal/", include_in_schema=False)
 async def portal_index():
-    from samjon_memory.portal.pages import render_portal_index
-    return HTMLResponse(content=render_portal_index())
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.on_event("startup")
+async def startup():
+    service = CoreService()
+    app.state.service = service

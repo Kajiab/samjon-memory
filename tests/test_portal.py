@@ -1,7 +1,9 @@
 """Portal boundary and functional tests."""
 
 import pytest
+from fastapi.testclient import TestClient
 from samjon_memory.core.service import CoreService
+from samjon_memory.core.main import app
 from samjon_memory.errors import NotFound
 
 
@@ -90,3 +92,30 @@ def test_portal_independent_memory_edit_not_collection_rewrite(service):
     m1_after = service.get_memory(m1["memory_id"])
     assert m1_after["version"] == original_m1_version
     assert m1_after["subject"] == "M1"
+
+
+def test_portal_static_index():
+    """GET /portal/ serves the static index.html."""
+    client = TestClient(app)
+    response = client.get("/portal/")
+    assert response.status_code == 200
+    assert "Samjon Memory Core Portal" in response.text
+    assert response.headers["content-type"].startswith("text/html")
+
+
+def test_portal_static_css():
+    """GET /portal/static/portal.css serves the stylesheet."""
+    client = TestClient(app)
+    response = client.get("/portal/static/portal.css")
+    assert response.status_code == 200
+    assert "font-family" in response.text
+    assert response.headers["content-type"].startswith("text/css")
+
+
+def test_portal_static_js():
+    """GET /portal/static/portal.js serves the JavaScript."""
+    client = TestClient(app)
+    response = client.get("/portal/static/portal.js")
+    assert response.status_code == 200
+    assert "const $=" in response.text
+    assert response.headers["content-type"].startswith("text/javascript")

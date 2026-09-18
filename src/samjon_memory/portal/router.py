@@ -35,6 +35,11 @@ READ_TOKEN_HEADER = "X-Service-Token"
 ADMIN_TOKEN_HEADER = "X-Admin-Token"
 CSRF_HEADER = "X-CSRF-Token"
 
+CSRF_COOKIE_NAME = "portal_csrf"
+READ_TOKEN_HEADER = "X-Service-Token"
+ADMIN_TOKEN_HEADER = "X-Admin-Token"
+CSRF_HEADER = "X-CSRF-Token"
+
 
 def _generate_csrf_token() -> str:
     return uuid.uuid4().hex[:32]
@@ -67,12 +72,6 @@ def _require_admin_token(x_admin_token: str = Header(None)) -> str:
 
 def _get_service() -> CoreService:
     return CoreService()
-
-
-@router.get("/portal/")
-async def portal_index(x_service_token: str = Header(None)):
-    _require_read_token(x_service_token)
-    service = _get_service()
 
 
 @router.get("/portal/memories")
