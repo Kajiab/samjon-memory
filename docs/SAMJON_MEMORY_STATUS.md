@@ -77,7 +77,7 @@ Detailed current implementation status for Samjon Memory Core V1.
 
 ## 6. Test Summary
 
-- **40 tests passing**
+- **43 tests passing**
 - **0 tests failing**
 - **2 new regression tests added:**
   - `test_collection_memory_edit.py::test_independent_collection_memory_edit`
