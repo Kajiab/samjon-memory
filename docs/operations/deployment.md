@@ -1,0 +1,32 @@
+# Deployment
+
+**Document ID:** SAMJON-DEP-001
+**Status:** CANONICAL
+**Owner:** Samjon Memory Engineering
+
+## 1. Purpose
+
+Deployment for Samjon Memory Core V1.
+
+## 2. Supported Deployment
+
+- Standalone FastAPI service
+- SQLite database file
+- Environment variables for configuration
+
+## 3. Configuration
+
+- SAMJON_CORE_DATABASE_PATH
+- SAMJON_CORE_SERVICE_TOKEN
+- SAMJON_CORE_ADMIN_TOKEN
+- SAMJON_CORE_READ_TOKEN
+- SAMJON_CORE_HOST
+- SAMJON_CORE_PORT
+- SAMJON_CORE_CORS_ORIGINS
+- SAMJON_CORE_IDEMPOTENCY_TTL_HOURS
+- SAMJON_CORE_PORTAL_ENABLED
+- SAMJON_CORE_LOG_LEVEL
+- SAMJON_CORE_MAX_RAW_CONTENT_CHARS
+- SAMJON_CORE_MAX_RAW_CONTENT_BYTES
+- SAMJON_CORE_MAX_QUERY_LIMIT
+- SAMJON_CORE_ENV

@@ -1,0 +1,26 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Samjon Memory Core V1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {"get": {"summary": "Health check"}},
+    "/ready": {"get": {"summary": "Readiness check"}},
+    "/api/v1/capabilities": {"get": {"summary": "Capabilities"}},
+    "/api/v1/core/memories": {
+      "post": {"summary": "Create memory"},
+      "get": {"summary": "List memories (not implemented)"},
+      "patch": {"summary": "Update memory"}
+    },
+    "/api/v1/core/memories/{memory_id}": {
+      "get": {"summary": "Get memory"},
+      "delete": {"summary": "Delete memory (not implemented)"}
+    },
+    "/api/v1/core/collections": {
+      "post": {"summary": "Create collection"},
+      "get": {"summary": "List collections (not implemented)"}
+    },
+    "/portal/": {"get": {"summary": "Portal index"}}
+  }
+}

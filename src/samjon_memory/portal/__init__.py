@@ -1,0 +1,1 @@
+"""Web Portal for Samjon Memory Core."""
