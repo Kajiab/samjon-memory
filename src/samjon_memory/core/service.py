@@ -164,6 +164,23 @@ class CoreService:
     def get_collection_memories(self, collection_id, limit=20, offset=0):
         return self.memories.list(collection_id=collection_id, limit=limit, offset=offset)
 
+    def get_audit_records(self, entity_id=None, entity_type=None, action=None, limit=50, offset=0):
+        """Retrieve audit records with optional filters."""
+        query = "SELECT * FROM audit_log WHERE 1=1"
+        params = []
+        if entity_id:
+            query += " AND entity_id=?"
+            params.append(entity_id)
+        if entity_type:
+            query += " AND entity_type=?"
+            params.append(entity_type)
+        if action:
+            query += " AND action=?"
+            params.append(action)
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        return [dict(r) for r in self.conn.execute(query, params).fetchall()]
+
     def _audit(self, entity_type, entity_id, action, actor, source, version):
         from samjon_memory.shared.helpers import sanitize_for_audit
         audit_id = generate_id("aud-")

@@ -35,6 +35,7 @@ tests/test_audit.py
 tests/test_auth.py
 tests/test_backup.py
 tests/test_collection.py
+tests/test_collection_memory_edit.py
 tests/test_idempotency.py
 tests/test_memory.py
 tests/test_migration.py
