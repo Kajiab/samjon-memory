@@ -20,7 +20,7 @@
 - Dashboard metrics: Implemented
 - Audit summary, filters, pagination: Implemented
 - Manual Portal verification: PASS
-- Resolver: Foundation A (schema 1.0.0, readiness)
+- Resolver: Foundation B (schema 1.1.0, full projection build)
 - MCP readiness: Not ready
 
 ## Core Baseline
@@ -72,15 +72,25 @@ Required configuration:
 
 ## Resolver
 
-- Status: Foundation A delivered; projection/rebuild/search not started
-- Resolver database (samjon_resolver.sqlite): created, schema 1.0.0
+- Status: Foundation B delivered (full projection build); search/ranking/selective not started
+- Resolver database (samjon_resolver.sqlite): created, schema 1.1.0
 - FTS5 availability check: Implemented (fail-fast RESOLVER_DATABASE_UNAVAILABLE)
 - Resolver migrations: Implemented and idempotent
 - Resolver schema metadata: Implemented
 - Resolver state + projection-audit foundations: schema only
 - Resolver database isolation from Core: PROVEN by tests
 - Resolver readiness independent of Core: PROVEN; `/resolver/ready` endpoint
-- Not implemented: projection, rebuild, search, ranking, freshness, selective rebuild, Resolver Portal
+- Full projection build (active standalone / collection / sections ordered by sequence): Implemented, PROVEN by tests
+- Active aliases, vocabulary, tags, and sanitized overrides projected: Implemented
+- Draft / superseded / forgotten / purged excluded: PROVEN by tests
+- Deterministic snapshot checksum: PROVEN by tests
+- Resolver schema `1.1.0`: snapshot + FTS5 + expansion-map tables
+- Atomic full rebuild (temp DB + coordinated swap + `.prev` rollback): Implemented
+- Interrupted-swap startup recovery: Implemented
+- Single-process rebuild lock (`REBUILD_IN_PROGRESS`): Implemented
+- Rebuild API: `POST /api/v1/resolver/rebuild` (admin), `GET .../rebuild/status` + `GET .../projection/status` (read token)
+- FTS5 rows match snapshot rows: PROVEN
+- Not implemented: search, ranking, freshness, selective rebuild, context expansion, Resolver Portal, AI, embeddings, MCP
 - Semantic search: Not implemented
 - AI enrichment: Not implemented
 - Embeddings: Not implemented
@@ -91,7 +101,7 @@ Required configuration:
 All tests pass with executable evidence:
 
 - Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 184
+- Passed: 208
 - Failed: 0
 - Skipped: 0
 - Verified: 2026-09-20

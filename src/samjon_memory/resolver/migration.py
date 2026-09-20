@@ -45,8 +45,87 @@ CREATE TABLE IF NOT EXISTS projection_status (
 CREATE INDEX IF NOT EXISTS idx_proj_status_entity ON projection_status(entity_type, entity_id);
 """
 
+_V110_SQL = """
+CREATE TABLE IF NOT EXISTS resolver_document_snapshot (
+    doc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL
+        CHECK (entity_type IN ('standalone_memory','collection_memory','collection')),
+    entity_id TEXT NOT NULL,
+    collection_id TEXT,
+    sequence_number INTEGER,
+    subject TEXT,
+    scope TEXT,
+    title TEXT,
+    section_path TEXT,
+    raw_content TEXT,
+    source TEXT,
+    language TEXT,
+    normalized_text TEXT,
+    match_scope_key TEXT,
+    core_version INTEGER,
+    core_checksum TEXT,
+    projected_at TEXT,
+    UNIQUE (entity_type, entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_snapshot_entity ON resolver_document_snapshot(entity_type, entity_id);
+CREATE VIRTUAL TABLE resolver_document_fts USING fts5(
+    entity_type UNINDEXED,
+    entity_id UNINDEXED,
+    collection_id UNINDEXED,
+    sequence_number UNINDEXED,
+    match_scope_key UNINDEXED,
+    subject,
+    title,
+    section_path,
+    raw_content,
+    normalized_text,
+    tokenize = 'unicode61'
+);
+CREATE TABLE IF NOT EXISTS resolver_alias_map (
+    alias_id TEXT PRIMARY KEY,
+    alias_term TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    language TEXT NOT NULL,
+    source TEXT,
+    core_version INTEGER,
+    core_checksum TEXT,
+    projected_at TEXT
+);
+CREATE TABLE IF NOT EXISTS resolver_vocab_map (
+    vocabulary_id TEXT PRIMARY KEY,
+    term TEXT NOT NULL,
+    definition_norm TEXT NOT NULL,
+    language TEXT NOT NULL,
+    source TEXT,
+    core_version INTEGER,
+    core_checksum TEXT,
+    projected_at TEXT
+);
+CREATE TABLE IF NOT EXISTS resolver_tag_map (
+    tag_id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    language TEXT NOT NULL,
+    source TEXT,
+    core_version INTEGER,
+    core_checksum TEXT,
+    projected_at TEXT
+);
+CREATE TABLE IF NOT EXISTS resolver_override_map (
+    override_id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value_snippet TEXT,
+    core_version INTEGER,
+    core_checksum TEXT,
+    projected_at TEXT
+);
+"""
+
 _MIGRATIONS = {
     "1.0.0": [_SCHEMA_SQL],
+    "1.1.0": [_V110_SQL],
 }
 
 

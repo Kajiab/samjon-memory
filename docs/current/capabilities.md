@@ -30,11 +30,18 @@ Proven capabilities for Samjon Memory Core V1.
 | Exact Origin validation | PROVEN | SAMJON_PORTAL_ALLOWED_ORIGINS |
 | Add Section auto-generates Memory ID | PROVEN | backend generates ID |
 | Collection Memories sorted by sequence_number ASC | PROVEN | Move Up/Down buttons correct |
+| Resolver database isolation | PROVEN | separate resolver DB; no Core fact tables and vice versa |
+| Resolver schema + migrations | PROVEN | `1.1.0` snapshot + FTS5 + expansion tables; idempotent |
+| Resolver FTS5 availability | PROVEN | fail-fast RESOLVER_DATABASE_UNAVAILABLE |
+| Resolver readiness endpoint | PROVEN | GET /resolver/ready, Core-independent |
+| Resolver full projection build | PROVEN | active standalone/collection/sections + durable metadata; inactive excluded |
+| Resolver atomic rebuild + rollback | PROVEN | temp DB swap, .prev rollback, interrupted-swap recovery |
+| Resolver rebuild lock | PROVEN | REBUILD_IN_PROGRESS |
+| Resolver rebuild API | PROVEN | admin-token rebuild; read-token status |
 | OpenAPI | PROVEN | drift test |
 
 ## 3. Limitations
 
-- No FTS5
-- No Resolver/FTS5/embeddings/MCP/AI
-- No semantic search
-- No AI enrichment
+- No FTS5 search query layer
+- No Resolver search / ranking / selective rebuild / context expansion / Resolver Portal
+- No semantic search / embeddings / vector search / AI enrichment / MCP

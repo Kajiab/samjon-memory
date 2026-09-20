@@ -121,10 +121,12 @@ samjon-memory/docs/SAMJON_MEMORY_STATUS.md
 | Web Portal | PROVEN | Portal tests |
 | Backup and restore | PROVEN | Backup tests |
 | FTS5 availability check | PROVEN | Resolver fail-fast test (RESOLVER_DATABASE_UNAVAILABLE) |
-| Resolver schema 1.0.0 + migrations | PROVEN | Resolver migration + idempotency tests |
+| Resolver schema 1.1.0 + migrations | PROVEN | Resolver migration + idempotency tests |
 | Resolver database isolation from Core | PROVEN | Core/Resolver isolation tests |
 | Resolver readiness endpoint | PROVEN | /resolver/ready endpoint test |
-| FTS5 search / projection / rebuild | NOT STARTED | Resolver Foundation B onward |
+| Resolver full projection build | PROVEN | Foundation B projection tests |
+| Resolver atomic rebuild + rollback | PROVEN | Foundation B rebuild tests |
+| FTS5 search / ranking / selective rebuild / context expansion / Resolver Portal | NOT STARTED | Resolver Foundation C onward |
 | Semantic search | NOT STARTED | Deferred |
 | AI enrichment | NOT STARTED | Deferred |
 | Embeddings/vector search | NOT STARTED | ADR required |

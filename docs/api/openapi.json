@@ -2244,6 +2244,137 @@
           }
         ]
       }
+    },
+    "/resolver/ready": {
+      "get": {
+        "summary": "Resolver Ready",
+        "description": "Dedicated Resolver readiness endpoint (independent of Core readiness).",
+        "operationId": "resolver_ready_resolver_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolver/rebuild": {
+      "post": {
+        "summary": "Rebuild Resolver",
+        "description": "Run a full projection rebuild (requires the existing REST admin token).",
+        "operationId": "rebuild_resolver_api_v1_resolver_rebuild_post",
+        "parameters": [
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolver/rebuild/status": {
+      "get": {
+        "summary": "Resolver Rebuild Status",
+        "description": "Return the latest rebuild status (requires the existing REST read token).",
+        "operationId": "resolver_rebuild_status_api_v1_resolver_rebuild_status_get",
+        "parameters": [
+          {
+            "name": "x-service-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Service-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resolver/projection/status": {
+      "get": {
+        "summary": "Resolver Projection Status",
+        "description": "Return projection state and per-entity status (read-token boundary).",
+        "operationId": "resolver_projection_status_api_v1_resolver_projection_status_get",
+        "parameters": [
+          {
+            "name": "x-service-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Service-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

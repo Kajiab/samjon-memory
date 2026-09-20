@@ -6,7 +6,8 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 
-> Planning document. No schema or migration code is written in this task.
+> Foundation A + B are implemented and tested for schema `1.1.0`; this
+> document records the design and guiding principles.
 
 ## 1. Principles
 
@@ -21,7 +22,7 @@
 
 ## 2. Resolver Schema Version
 
-- `RESOLVER_SCHEMA_VERSION = "1.0.0"` (reserved for implementation).
+- `RESOLVER_SCHEMA_VERSION = "1.1.0"` (implemented: snapshot + FTS5 + expansion tables).
 - Stored in the Resolver `schema_metadata` under `resolver_schema_version`.
 
 ## 3. Tables

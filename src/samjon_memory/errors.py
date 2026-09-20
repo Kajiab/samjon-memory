@@ -47,6 +47,14 @@ class ResolverDatabaseUnavailable(SamjonMemoryError):
     def __init__(self, message="RESOLVER_DATABASE_UNAVAILABLE"):
         super().__init__("RESOLVER_DATABASE_UNAVAILABLE", message, 503)
 
+class RebuildInProgress(SamjonMemoryError):
+    def __init__(self, message="REBUILD_IN_PROGRESS"):
+        super().__init__("REBUILD_IN_PROGRESS", message, 409)
+
+class ProjectionFailed(SamjonMemoryError):
+    def __init__(self, message="PROJECTION_FAILED"):
+        super().__init__("PROJECTION_FAILED", message, 500)
+
 class MigrationRequired(SamjonMemoryError):
     def __init__(self, message="MIGRATION_REQUIRED"):
         super().__init__("MIGRATION_REQUIRED", message, 503)

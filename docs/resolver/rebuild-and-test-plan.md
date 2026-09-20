@@ -6,7 +6,8 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 
-> Planning document. No code is written in this task.
+> Foundation B (full projection rebuild) is implemented and tested; this
+> document records the design and the remaining Foundation C work.
 
 ## 1. Rebuild Design
 

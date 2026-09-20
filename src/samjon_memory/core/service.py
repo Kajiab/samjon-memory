@@ -63,6 +63,45 @@ class CoreService:
     def query_memories(self, **filters):
         return self.memories.list(**filters)
 
+    def resolver_projection_snapshot(self, limit=10000):
+        """Read-only active-knowledge snapshot for the Resolver projection.
+
+        Returns only Active Collections, Memories, and durable metadata. This
+        method never writes to Core and never creates audit events.
+        """
+        def _select(sql):
+            return [
+                dict(r)
+                for r in self.conn.execute(sql, (limit,)).fetchall()
+            ]
+
+        return {
+            "collections": _select(
+                "SELECT * FROM memory_collection WHERE status='active' "
+                "ORDER BY collection_id LIMIT ?"
+            ),
+            "memories": _select(
+                "SELECT * FROM memory WHERE status='active' "
+                "ORDER BY collection_id, sequence_number, memory_id LIMIT ?"
+            ),
+            "aliases": _select(
+                "SELECT * FROM durable_alias WHERE status='active' "
+                "ORDER BY alias_id LIMIT ?"
+            ),
+            "vocabulary": _select(
+                "SELECT * FROM durable_vocabulary WHERE status='active' "
+                "ORDER BY vocabulary_id LIMIT ?"
+            ),
+            "user_tags": _select(
+                "SELECT * FROM durable_user_tag WHERE status='active' "
+                "ORDER BY tag_id LIMIT ?"
+            ),
+            "overrides": _select(
+                "SELECT * FROM manual_override WHERE status='active' "
+                "ORDER BY override_id LIMIT ?"
+            ),
+        }
+
     def supersede_memory(self, memory_id, replacement_id, actor="system"):
         existing = self.memories.get(memory_id)
         if not existing:

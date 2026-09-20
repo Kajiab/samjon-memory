@@ -6,6 +6,11 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 **Depends on:** Core V1.1 frozen baseline (`docs/core/CORE_V1_FREEZE.md`)
+**Implementation status:** Foundation A + B are implemented and tested
+(schema `1.1.0`, resolver readiness, full projection build, atomic rebuild with
+rollback, rebuild/projection-status API). Search, ranking, result-type
+resolution, selective rebuild, context expansion, and the Resolver Portal
+remain PLANNED (not implemented).
 
 > This is a planning document. No code, migrations, routes, Portal, or
 > capability changes are implemented in this task. Resolver status is

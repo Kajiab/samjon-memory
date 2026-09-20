@@ -4,6 +4,7 @@ import sqlite3
 from typing import Optional
 
 from samjon_memory.resolver.constants import RESOLVER_SCHEMA_VERSION
+from samjon_memory.resolver.config import load_config
 from samjon_memory.resolver.database import fts5_available, get_connection
 from samjon_memory.resolver.migration import ensure_schema, get_schema_version
 
@@ -16,7 +17,10 @@ class ResolverService:
     """
 
     def __init__(self, database_path: Optional[str] = None):
-        self.conn = get_connection(database_path)
+        self.database_path = database_path or load_config().database_path
+        from samjon_memory.resolver.rebuild import recover_interrupted_swap
+        recover_interrupted_swap(self.database_path)
+        self.conn = get_connection(self.database_path)
         ensure_schema(self.conn)
 
     def _db_ok(self) -> bool:
@@ -57,7 +61,9 @@ class ResolverService:
                 "schema_ok": schema_ok,
                 "fts5_available": fts5,
                 "projection_built": self._projection_built(),
-                "projection_freshness": None,
+                "projection_freshness": self._projection_freshness(),
+                "counts": self._counts(),
+                "snapshot_checksum": self._snapshot_checksum(),
             }
         }
 
@@ -67,6 +73,84 @@ class ResolverService:
             "SELECT * FROM resolver_state WHERE state_id=1"
         ).fetchone()
         return dict(row) if row else {}
+
+    def _projection_freshness(self):
+        return "fresh" if self._projection_built() else None
+
+    def _counts(self) -> dict:
+        state = {}
+        try:
+            state = self.state()
+        except sqlite3.Error:
+            state = {}
+        return {
+            "collections": state.get("count_collections"),
+            "memories": state.get("count_memories"),
+            "sections": state.get("count_sections"),
+        }
+
+    def _snapshot_checksum(self):
+        try:
+            return self.state().get("snapshot_checksum")
+        except sqlite3.Error:
+            return None
+
+    def full_rebuild(self, core_service):
+        """Run an atomic full projection rebuild (Admin action)."""
+        from samjon_memory.resolver import rebuild as _rebuild
+
+        self._close_conn()
+        try:
+            return _rebuild.full_rebuild(core_service, self.database_path)
+        finally:
+            self.conn = get_connection(self.database_path)
+            ensure_schema(self.conn)
+
+    def _close_conn(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+
+    def rebuild_status(self) -> dict:
+        from samjon_memory.resolver import rebuild as _rebuild
+
+        state = {}
+        try:
+            state = self.state()
+        except sqlite3.Error:
+            state = {}
+        rows = self.projection_audit(limit=5)
+        last_status = rows[0]["status"] if rows else None
+        return {
+            "in_progress": _rebuild.rebuild_in_progress(),
+            "last_build_id": state.get("last_full_build_id"),
+            "last_build_status": last_status,
+            "projected_at": state.get("projected_at"),
+            "snapshot_checksum": state.get("snapshot_checksum"),
+            "counts": self._counts(),
+        }
+
+    def projection_status(self, limit: int = 200) -> dict:
+        state = {}
+        try:
+            state = self.state()
+        except sqlite3.Error:
+            state = {}
+        rows = self.conn.execute(
+            "SELECT entity_type, entity_id, core_version, core_checksum, "
+            "projected_at FROM projection_status ORDER BY entity_type, entity_id "
+            "LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return {
+            "last_full_build_id": state.get("last_full_build_id"),
+            "projected_at": state.get("projected_at"),
+            "snapshot_checksum": state.get("snapshot_checksum"),
+            "resolver_schema_version": state.get("resolver_schema_version"),
+            "count": len(rows),
+            "entities": [dict(r) for r in rows],
+        }
 
     def projection_audit(self, limit: int = 20) -> list:
         """Return recent projection_audit rows (foundation, read-only)."""

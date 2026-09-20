@@ -1,8 +1,21 @@
 """Resolver V1 constants and limits."""
 
 # Resolver database
-RESOLVER_SCHEMA_VERSION = "1.0.0"
+RESOLVER_SCHEMA_VERSION = "1.1.0"
 RESOLVER_DB_FILENAME = "samjon_resolver.sqlite"
+
+# Projected document entity types
+ENTITY_STANDALONE_MEMORY = "standalone_memory"
+ENTITY_COLLECTION_MEMORY = "collection_memory"
+ENTITY_COLLECTION = "collection"
+DOCUMENT_ENTITY_TYPES = {
+    ENTITY_STANDALONE_MEMORY,
+    ENTITY_COLLECTION_MEMORY,
+    ENTITY_COLLECTION,
+}
+
+# Projection audit history bound (rows kept in each rebuilt Resolver DB)
+PROJECTION_AUDIT_HISTORY_LIMIT = 50
 
 # Projection audit build types
 BUILD_TYPE_FULL = "full"
