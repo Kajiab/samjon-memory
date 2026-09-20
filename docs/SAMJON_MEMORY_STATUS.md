@@ -9,19 +9,24 @@
 ## Current Phase
 
 - Project status: Core V1 complete and verified
-- Current phase: Core V1 frozen, Resolver not started
-- Core database schema: V1 frozen
-- Core REST API: V1 frozen
+- Current phase: Core V1 delivered, Resolver not started
+- Core database schema: 1.1.0
+- Core REST API: V1
 - CoreService: Implemented
 - Core Portal: Server-rendered, verified
-- Core Freeze overall: Portal V1 verified
+- Memory Activate: Implemented
+- Lifecycle (Forget / Restore / Purge): Implemented
+- Administration page: Implemented
+- Dashboard metrics: Implemented
+- Audit summary, filters, pagination: Implemented
+- Manual Portal verification: PASS
 - Resolver: Not started
 - MCP readiness: Not ready
 
 ## Core Baseline
 
-- Core schema and API are the existing baseline
-- Core migrations, repositories, CoreService, and API contracts are NOT modified
+- Core schema is versioned at 1.1.0
+- Lifecycle (activate / restore / purge) and audit (summary, filters, pagination) are implemented on top of the V1 core
 - Portal is server-rendered with HTTP Basic auth and exact Origin validation
 
 ## Portal Implementation
@@ -37,9 +42,16 @@ The Core Portal has been verified with:
 - Exact Origin validation for mutations
 - No-side-effect Cancel behavior
 - Add Section creates Memory ID automatically
+- Collection subject/scope consistency invariant (sections inherit; move requires match; immutable once sections exist)
 - Collection Memories sorted by sequence_number ASC
 - Move Up / Move Down works correctly
 - Reorder increments Collection version
+- Memory Activate (draft -> active)
+- Restore returns to draft
+- Purge is irreversible (30-day retention, admin + "PURGE" confirmation)
+- Administration page (forgotten/purged, retention, audit, schema + db status)
+- Dashboard metrics (Memories / Collections / System Overview)
+- Audit summary + filters + pagination
 
 Required configuration:
 
@@ -49,7 +61,7 @@ Required configuration:
 
 ## Portal Status
 
-- Server-rendered Portal: Implemented (18 routes)
+- Server-rendered Portal: Implemented
 - HTTP Basic authentication: Verified by tests
 - Exact Origin validation: Verified by tests
 - Memory Portal workflow: Verified by tests
@@ -73,46 +85,20 @@ Required configuration:
 All tests pass with executable evidence:
 
 - Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 84
+- Passed: 172
 - Failed: 0
 - Skipped: 0
 - Verified: 2026-09-20
 
-### Portal Security Tests (11)
-- test_missing_credentials_return_401
-- test_www_authenticate_basic_present
-- test_invalid_username_rejected
-- test_invalid_password_rejected
-- test_valid_credentials_allow_access
-- test_authenticated_routes_require_credentials (4 routes)
-- test_unapproved_origin_rejected_on_mutation
-- test_approved_origin_succeeds_on_mutation
-- test_credentials_absent_from_html
-- test_credentials_absent_from_capabilities
-- test_cancel_create_memory_no_mutation
-- test_xss_safe_rendering
-
-### Portal Functional Tests (27)
-- test_memory_list_empty
-- test_memory_list_shows_created
-- test_memory_detail
-- test_memory_detail_not_found
-- test_memory_create_form
-- test_memory_create_submission
-- test_memory_edit_form
-- test_memory_edit_submission
-- test_memory_supersede
-- test_memory_forget
-- test_collection_list_empty
-- test_collection_create_form
-- test_collection_create_submission
-- test_collection_detail
-- test_collection_edit_form
-- test_collection_edit_submission
-- test_collection_add_memory
-- test_collection_reorder
-- test_collection_activate
-- test_audit_log
-- test_edit_version_conflict_shown
-- test_cancel_create_memory_link
-- test_independent_collection_memory_edit
+### Coverage Areas
+- Migration and migration idempotency (schema 1.1.0, backfill of `forgotten_at` from audit)
+- Memory create/read/query/update/supersede/forget/activate/restore/purge
+- Collection create/edit/order/validate/activate/restore/purge, independent section editing
+- Collection subject/scope consistency (sections inherit subject/scope, title is the section name, move-existing requires match, collection immutable once sections exist)
+- Dashboard metrics + filtered-list links
+- Forget/Restore/Purge lifecycle, purge guards (30-day retention, admin, `PURGE` confirmation), tombstones, related-metadata erasure
+- Audit summary, filters (action/entity_type/entity_id/since/until), pagination, sanitization, append-only
+- Portal UI + security (HTTP Basic, exact Origin, XSS, Cancel no-side-effect)
+- Administration page (forgotten/purged, purge eligibility, tombstone/audit counts, schema/db status)
+- Idempotency, content limits, sensitive-data rejection, backup/isolated restore
+- OpenAPI drift + route registration

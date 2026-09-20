@@ -380,19 +380,22 @@ async def portal_add_memory_to_collection(collection_id: str, request: Request, 
     validate_origin(request)
     svc = _svc(request)
     form = await request.form()
-    memory_data = {
-        "subject": form.get("title", ""),
+    data = {
+        "title": form.get("title", ""),
         "memory_type": form.get("memory_type", "fact"),
         "raw_content": form.get("raw_content", ""),
-        "source": "portal",
         "language": form.get("language", "en"),
+        "source": "portal",
     }
     if form.get("structured_value", ""):
-        memory_data["structured_value_json"] = form["structured_value"]
+        data["structured_value_json"] = form["structured_value"]
+    if form.get("sequence_number", ""):
+        try:
+            data["sequence_number"] = int(form["sequence_number"])
+        except (TypeError, ValueError):
+            pass
     try:
-        mem = svc.create_memory(memory_data, actor="portal")
-        sequence_number = int(form.get("sequence_number", "1"))
-        svc.add_memory_to_collection(collection_id, mem["memory_id"], sequence_number, actor="portal")
+        svc.add_section_to_collection(collection_id, data, actor="portal")
         return RedirectResponse(url=f"/portal/collections/{collection_id}?message=section_added", status_code=303)
     except SamjonMemoryError as e:
         return RedirectResponse(url=f"/portal/collections/{collection_id}?message=error: {e.message}", status_code=303)

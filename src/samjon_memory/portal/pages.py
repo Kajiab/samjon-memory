@@ -567,7 +567,7 @@ def _assembled_preview(memories):
         return ""
     ordered = sorted(memories, key=lambda x: x.get("sequence_number", 0))
     blocks = "".join(
-        f'<article class="preview-block"><h3>{_e(m.get("subject",""))}</h3>'
+        f'<article class="preview-block"><h3>{_e(m.get("title") or m.get("subject") or "")}</h3>'
         f'<pre>{_e(m.get("raw_content",""))}</pre></article>'
         for m in ordered
     )
@@ -640,7 +640,7 @@ def collection_detail(collection, memories, validation, message="") -> str:
         rows = []
         for i, m in enumerate(memories):
             mid = _e(m["memory_id"])
-            subject = _e(m.get("subject", ""))
+            label = _e(m.get("title") or m.get("subject") or "")
             seq = _e(m.get("sequence_number", ""))
             up_disabled = ' disabled' if i == 0 else ""
             down_disabled = ' disabled' if i == len(memories) - 1 else ""
@@ -656,16 +656,16 @@ def collection_detail(collection, memories, validation, message="") -> str:
                 controls = (
                     f'<a class="btn btn-xsmall" href="/portal/memories/{mid}/edit">Edit</a>'
                     f'<form method="post" action="/portal/collections/{cid}/memories/{mid}/move-up">'
-                    f'<button type="submit" class="btn btn-xsmall"{up_disabled} aria-label="Move {subject} up" title="Move up">Up</button></form>'
+                    f'<button type="submit" class="btn btn-xsmall"{up_disabled} aria-label="Move {label} up" title="Move up">Up</button></form>'
                     f'<form method="post" action="/portal/collections/{cid}/memories/{mid}/move-down">'
-                    f'<button type="submit" class="btn btn-xsmall"{down_disabled} aria-label="Move {subject} down" title="Move down">Down</button></form>'
+                    f'<button type="submit" class="btn btn-xsmall"{down_disabled} aria-label="Move {label} down" title="Move down">Down</button></form>'
                     f'<form method="post" action="/portal/memories/{mid}/forget" '
                     "onsubmit=\"return confirm('Forget this section? This cannot be undone.')\">"
                     f'<button type="submit" class="btn btn-xsmall btn-danger">Forget</button></form>'
                 )
             rows.append(
                 f"<tr><td>{seq}</td>"
-                f"<td>{subject} <span class=\"mono\">{mid}</span></td>"
+                f"<td>{label} <span class=\"mono\">{mid}</span></td>"
                 f"<td>{_status_badge(m.get('status',''))}</td>"
                 f"<td>{_e(m.get('version',''))}</td>"
                 f'<td class="section-controls">{controls}</td></tr>'

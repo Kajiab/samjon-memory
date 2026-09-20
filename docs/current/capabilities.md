@@ -14,10 +14,15 @@ Proven capabilities for Samjon Memory Core V1.
 |---|---|---|
 | SQLite schema | PROVEN | migrations.py |
 | Core memory CRUD | PROVEN | create/get/update/query/supersede/forget |
-| Collection lifecycle | PROVEN | draft/active/reorder/validate |
-| Durable metadata | PROVEN | alias/vocabulary/tag/manual_override |
+| Memory activate | PROVEN | draft -> active, version bump, audit |
+| Restore | PROVEN | forgotten -> draft, version bump, audit |
+| Purge | PROVEN | irreversible, forgotten >= 30 days, admin + "PURGE" confirmation, tombstone |
+| Collection lifecycle | PROVEN | draft/active/reorder/validate/restore/purge |
+| Durable metadata | PROVEN | alias/vocabulary/tag/manual_override; erased on memory purge |
 | Idempotency | PROVEN | header-based |
-| Audit | PROVEN | audit_log table |
+| Audit | PROVEN | audit_log; summary, filters, pagination |
+| Dashboard metrics | PROVEN | Memories / Collections / System Overview |
+| Administration page | PROVEN | forgotten/purged, retention, schema/db status |
 | Backup/restore | PROVEN | isolated restore |
 | Sensitive data rejection | PROVEN | credential detection |
 | Web Portal | PROVEN | HTML portal, server-rendered |

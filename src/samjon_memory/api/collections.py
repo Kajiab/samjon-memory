@@ -3,7 +3,7 @@ from fastapi import APIRouter, Header
 from typing import List
 from pydantic import BaseModel
 from samjon_memory.core.service import CoreService
-from samjon_memory.core.models import CollectionCreate, CollectionUpdate
+from samjon_memory.core.models import CollectionCreate, CollectionUpdate, CollectionMemoryCreate
 router = APIRouter()
 
 
@@ -33,9 +33,9 @@ async def get_collection_memories(collection_id: str, limit: int = 20, offset: i
     return service.get_collection_memories(collection_id, limit=limit, offset=offset)
 
 @router.post("/api/v1/core/collections/{collection_id}/memories", response_model=None)
-async def add_memory_to_collection(collection_id: str, memory_id: str, sequence_number: int, actor: str = Header("system")):
+async def add_memory_to_collection(collection_id: str, body: CollectionMemoryCreate, actor: str = Header("system")):
     service = CoreService()
-    return service.add_memory_to_collection(collection_id, memory_id, sequence_number, actor=actor)
+    return service.add_section_to_collection(collection_id, body.model_dump(exclude_unset=True), actor=actor)
 
 @router.put("/api/v1/core/collections/{collection_id}/order", response_model=None)
 async def reorder_collection(collection_id: str, ordered_memory_ids: List[str], actor: str = Header("system")):

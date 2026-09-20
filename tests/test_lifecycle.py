@@ -100,7 +100,7 @@ def test_restore_rejects_non_forgotten(service, status):
 
 def test_restore_section_bumps_collection_version(service):
     coll = service.create_collection({"subject": "c", "title": "C", "source": "t"})
-    section = service.create_memory({"subject": "sec", "raw_content": "c", "source": "t"})
+    section = service.create_memory({"subject": "c", "raw_content": "c", "source": "t"})
     service.add_memory_to_collection(coll["collection_id"], section["memory_id"], 1)
     service.forget_memory(section["memory_id"])
     coll_before = service.get_collection(coll["collection_id"])["version"]
@@ -248,7 +248,7 @@ def test_restore_rejects_purged(service):
 
 def test_purge_section_bumps_collection_version(service):
     coll = service.create_collection({"subject": "c", "title": "C", "source": "t"})
-    section = service.create_memory({"subject": "sec", "raw_content": "c", "source": "t"})
+    section = service.create_memory({"subject": "c", "raw_content": "c", "source": "t"})
     service.add_memory_to_collection(coll["collection_id"], section["memory_id"], 1)
     service.forget_memory(section["memory_id"])
     _purge_eligible(service, section["memory_id"])

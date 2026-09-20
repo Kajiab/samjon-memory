@@ -725,24 +725,6 @@
             }
           },
           {
-            "name": "memory_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Memory Id"
-            }
-          },
-          {
-            "name": "sequence_number",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Sequence Number"
-            }
-          },
-          {
             "name": "actor",
             "in": "header",
             "required": false,
@@ -753,6 +735,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionMemoryCreate"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2335,6 +2327,97 @@
           "source"
         ],
         "title": "CollectionCreate"
+      },
+      "CollectionMemoryCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "raw_content": {
+            "type": "string",
+            "title": "Raw Content"
+          },
+          "memory_type": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Memory Type",
+            "default": "fact"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 10,
+            "title": "Language",
+            "default": "en"
+          },
+          "sequence_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence Number"
+          },
+          "structured_value_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured Value Json"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "raw_content"
+        ],
+        "title": "CollectionMemoryCreate",
+        "description": "New section payload for Add Section.\n\nsubject/scope are optional; if provided they must match the Collection,\notherwise the request is rejected. The section's subject/scope always come\nfrom the Collection, never from the title."
       },
       "CollectionUpdate": {
         "properties": {

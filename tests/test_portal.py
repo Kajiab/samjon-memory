@@ -19,6 +19,19 @@ def client(temp_db):
     return c
 
 
+def _make_sections(svc, coll, labels):
+    """Create Collection sections that inherit subject/scope, with distinct titles."""
+    mems = []
+    for i, label in enumerate(labels, start=1):
+        mem = svc.create_memory({
+            "subject": coll["subject"], "scope": coll["scope"],
+            "title": label, "raw_content": label.lower(), "source": "test",
+        })
+        svc.add_memory_to_collection(coll["collection_id"], mem["memory_id"], i)
+        mems.append(svc.get_memory(mem["memory_id"]))
+    return mems
+
+
 # ---- Memory list ----
 
 def test_memory_list_empty(client):
@@ -276,9 +289,7 @@ def test_activate_enabled_after_three_valid_sections(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "enable test", "title": "Enable", "source": "test", "expected_item_count": 3})
-    for i in range(3):
-        mem = svc.create_memory({"subject": f"sec {i}", "raw_content": f"content {i}", "source": "test"})
-        svc.add_memory_to_collection(coll["collection_id"], mem["memory_id"], i + 1)
+    _make_sections(svc, coll, ["sec 0", "sec 1", "sec 2"])
     resp = client.get(f"/portal/collections/{coll['collection_id']}")
     assert resp.status_code == 200
     assert "Ready to activate" in resp.text
@@ -290,10 +301,7 @@ def test_collection_reorder(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "reorder test", "title": "Reorder", "source": "test"})
-    m1 = svc.create_memory({"subject": "m1", "raw_content": "c1", "source": "test"})
-    m2 = svc.create_memory({"subject": "m2", "raw_content": "c2", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
+    m1, m2 = _make_sections(svc, coll, ["a", "b"])
     resp = client.post(f"/portal/collections/{coll['collection_id']}/order", data={
         "ordered_memory_ids": f"{m2['memory_id']},{m1['memory_id']}",
     }, headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
@@ -307,8 +315,7 @@ def test_collection_activate(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "act test", "title": "Activate", "source": "test"})
-    mem = svc.create_memory({"subject": "mem", "raw_content": "content", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], mem["memory_id"], 1)
+    (mem,) = _make_sections(svc, coll, ["sec"])
     resp = client.post(f"/portal/collections/{coll['collection_id']}/activate", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     assert resp.status_code == 303
     updated = svc.get_collection(coll["collection_id"])
@@ -365,12 +372,7 @@ def test_move_up_down_disabled_at_boundaries(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "boundary test", "title": "Boundary", "source": "test", "expected_item_count": 3})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    m3 = svc.create_memory({"subject": "C", "raw_content": "c", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
-    svc.add_memory_to_collection(coll["collection_id"], m3["memory_id"], 3)
+    m1, m2, m3 = _make_sections(svc, coll, ["A", "B", "C"])
     resp = client.get(f"/portal/collections/{coll['collection_id']}")
     assert resp.status_code == 200
     assert f'action="/portal/collections/{coll["collection_id"]}/memories/{m1["memory_id"]}/move-up"' in resp.text
@@ -383,17 +385,12 @@ def test_down_of_a_reorders_b_a_c(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "down-a test", "title": "Down A", "source": "test", "expected_item_count": 3})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    m3 = svc.create_memory({"subject": "C", "raw_content": "c", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
-    svc.add_memory_to_collection(coll["collection_id"], m3["memory_id"], 3)
+    m1, m2, m3 = _make_sections(svc, coll, ["A", "B", "C"])
     resp = client.post(f"/portal/collections/{coll['collection_id']}/memories/{m1['memory_id']}/move-down", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     assert resp.status_code == 303
     memories = svc.get_collection_memories(coll["collection_id"])
-    subjects = [m["subject"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
-    assert subjects == ["B", "A", "C"]
+    titles = [m["title"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
+    assert titles == ["B", "A", "C"]
 
 
 def test_up_of_c_reorders_a_c_b(client, temp_db):
@@ -402,17 +399,12 @@ def test_up_of_c_reorders_a_c_b(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "up-c test", "title": "Up C", "source": "test", "expected_item_count": 3})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    m3 = svc.create_memory({"subject": "C", "raw_content": "c", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
-    svc.add_memory_to_collection(coll["collection_id"], m3["memory_id"], 3)
+    m1, m2, m3 = _make_sections(svc, coll, ["A", "B", "C"])
     resp = client.post(f"/portal/collections/{coll['collection_id']}/memories/{m3['memory_id']}/move-up", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     assert resp.status_code == 303
     memories = svc.get_collection_memories(coll["collection_id"])
-    subjects = [m["subject"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
-    assert subjects == ["A", "C", "B"]
+    titles = [m["title"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
+    assert titles == ["A", "C", "B"]
 
 
 def test_up_of_b_reorders_b_a_c(client, temp_db):
@@ -421,17 +413,12 @@ def test_up_of_b_reorders_b_a_c(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "up-b test", "title": "Up B", "source": "test", "expected_item_count": 3})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    m3 = svc.create_memory({"subject": "C", "raw_content": "c", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
-    svc.add_memory_to_collection(coll["collection_id"], m3["memory_id"], 3)
+    m1, m2, m3 = _make_sections(svc, coll, ["A", "B", "C"])
     resp = client.post(f"/portal/collections/{coll['collection_id']}/memories/{m2['memory_id']}/move-up", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     assert resp.status_code == 303
     memories = svc.get_collection_memories(coll["collection_id"])
-    subjects = [m["subject"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
-    assert subjects == ["B", "A", "C"]
+    titles = [m["title"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
+    assert titles == ["B", "A", "C"]
 
 
 def test_down_of_b_reorders_a_c_b(client, temp_db):
@@ -440,17 +427,12 @@ def test_down_of_b_reorders_a_c_b(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "down-b test", "title": "Down B", "source": "test", "expected_item_count": 3})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    m3 = svc.create_memory({"subject": "C", "raw_content": "c", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
-    svc.add_memory_to_collection(coll["collection_id"], m3["memory_id"], 3)
+    m1, m2, m3 = _make_sections(svc, coll, ["A", "B", "C"])
     resp = client.post(f"/portal/collections/{coll['collection_id']}/memories/{m2['memory_id']}/move-down", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     assert resp.status_code == 303
     memories = svc.get_collection_memories(coll["collection_id"])
-    subjects = [m["subject"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
-    assert subjects == ["A", "C", "B"]
+    titles = [m["title"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
+    assert titles == ["A", "C", "B"]
 
 
 def test_boundary_move_does_not_corrupt_order(client, temp_db):
@@ -459,20 +441,15 @@ def test_boundary_move_does_not_corrupt_order(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "boundary-corrupt test", "title": "Boundary", "source": "test", "expected_item_count": 3})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    m3 = svc.create_memory({"subject": "C", "raw_content": "c", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
-    svc.add_memory_to_collection(coll["collection_id"], m3["memory_id"], 3)
+    m1, m2, m3 = _make_sections(svc, coll, ["A", "B", "C"])
     client.post(f"/portal/collections/{coll['collection_id']}/memories/{m1['memory_id']}/move-up", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     memories = svc.get_collection_memories(coll["collection_id"])
-    subjects = [m["subject"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
-    assert subjects == ["A", "B", "C"]
+    titles = [m["title"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
+    assert titles == ["A", "B", "C"]
     client.post(f"/portal/collections/{coll['collection_id']}/memories/{m3['memory_id']}/move-down", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     memories = svc.get_collection_memories(coll["collection_id"])
-    subjects = [m["subject"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
-    assert subjects == ["A", "B", "C"]
+    titles = [m["title"] for m in sorted(memories, key=lambda m: m.get("sequence_number", 0))]
+    assert titles == ["A", "B", "C"]
 
 
 def test_move_preserves_other_sections(client, temp_db):
@@ -481,19 +458,14 @@ def test_move_preserves_other_sections(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "preserve test", "title": "Preserve", "source": "test", "expected_item_count": 3})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    m3 = svc.create_memory({"subject": "C", "raw_content": "c", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
-    svc.add_memory_to_collection(coll["collection_id"], m3["memory_id"], 3)
+    m1, m2, m3 = _make_sections(svc, coll, ["A", "B", "C"])
     v1_before = svc.get_memory(m1["memory_id"])["version"]
     v3_before = svc.get_memory(m3["memory_id"])["version"]
     client.post(f"/portal/collections/{coll['collection_id']}/memories/{m2['memory_id']}/move-up", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
-    assert svc.get_memory(m1["memory_id"])["subject"] == "A"
+    assert svc.get_memory(m1["memory_id"])["title"] == "A"
     assert svc.get_memory(m1["memory_id"])["raw_content"] == "a"
     assert svc.get_memory(m1["memory_id"])["version"] == v1_before
-    assert svc.get_memory(m3["memory_id"])["subject"] == "C"
+    assert svc.get_memory(m3["memory_id"])["title"] == "C"
     assert svc.get_memory(m3["memory_id"])["raw_content"] == "c"
     assert svc.get_memory(m3["memory_id"])["version"] == v3_before
 
@@ -504,10 +476,7 @@ def test_collection_version_increments_on_reorder(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "version-test", "title": "Version Test", "source": "test", "expected_item_count": 2})
-    m1 = svc.create_memory({"subject": "A", "raw_content": "a", "source": "test"})
-    m2 = svc.create_memory({"subject": "B", "raw_content": "b", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
-    svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
+    m1, m2 = _make_sections(svc, coll, ["A", "B"])
     v_before = svc.get_collection(coll["collection_id"])["version"]
     client.post(f"/portal/collections/{coll['collection_id']}/memories/{m1['memory_id']}/move-down", headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
     v_after = svc.get_collection(coll["collection_id"])["version"]
@@ -522,10 +491,9 @@ def test_independent_collection_memory_edit(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     coll = svc.create_collection({"subject": "indep test", "title": "Indep", "source": "test"})
-    mem = svc.create_memory({"subject": "indep mem", "raw_content": "original", "source": "test"})
-    svc.add_memory_to_collection(coll["collection_id"], mem["memory_id"], 1)
-    svc.update_memory(mem["memory_id"], {"subject": "indep mem edited", "expected_version": 1}, actor="portal")
+    (mem,) = _make_sections(svc, coll, ["indep section"])
+    svc.update_memory(mem["memory_id"], {"title": "indep section edited", "expected_version": 1}, actor="portal")
     updated_mem = svc.get_memory(mem["memory_id"])
-    assert updated_mem["subject"] == "indep mem edited"
+    assert updated_mem["title"] == "indep section edited"
     updated_coll = svc.get_collection(coll["collection_id"])
     assert updated_coll["status"] == "draft"

@@ -12,11 +12,12 @@ Portal security for Samjon Memory Core V1.
 
 - Exactly one configured household administrator account
 - Configuration: `SAMJON_PORTAL_USERNAME`, `SAMJON_PORTAL_PASSWORD`, `SAMJON_PORTAL_ALLOWED_ORIGINS`
-- HTTP Basic Authentication for all Portal routes
+- HTTP Basic Authentication for all Portal routes (including `/portal/admin`)
 - Missing/invalid credentials return 401 with `WWW-Authenticate: Basic`
 - No users table, no registration, no custom login page
 - No session cookies, no login nonce, no logout tracking
 - No multiple Portal users or roles
+- Purge is administrator-only (HTTP Basic admin + "PURGE" confirmation + 30-day retention)
 
 ## 3. Origin Validation
 

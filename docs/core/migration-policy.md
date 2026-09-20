@@ -10,7 +10,8 @@ Schema migration policy for Samjon Memory Core V1.
 
 ## 2. Policy
 
-- Schema version stored in schema_metadata
+- Schema version stored in schema_metadata (current: 1.1.0)
 - Migrations run on startup via ensure_schema()
-- Versioned migrations in migration.py
+- Versioned migrations in migration.py (ordered version -> SQL map)
 - No down migrations (only forward)
+- 1.1.0 adds lifecycle columns (`forgotten_at`, `purged_at`, `purged_by`), `lifecycle_tombstone`, and backfills `forgotten_at` from reliable audit evidence only (rows without evidence stay NULL and are purge-ineligible)

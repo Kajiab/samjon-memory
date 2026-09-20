@@ -29,13 +29,21 @@ This is the documentation entry point and authority map for Samjon Memory.
 | docs/SAMJON_MEMORY_STATUS.md | CANONICAL | Detailed current implementation status |
 | docs/current/architecture.md | CANONICAL | Runtime architecture |
 | docs/current/capabilities.md | CANONICAL | Proven capabilities |
+| docs/current/data-ownership.md | CANONICAL | Data ownership and privacy |
+| docs/current/web-portal.md | CANONICAL | Web portal features and architecture |
 | docs/core/data-model.md | CANONICAL | Data model |
+| docs/core/memory-lifecycle.md | CANONICAL | Memory lifecycle |
 | docs/core/api-contract.md | CANONICAL | API contract |
+| docs/core/migration-policy.md | CANONICAL | Migration policy |
+| docs/core/backup-restore.md | CANONICAL | Backup and restore |
 | docs/api/error-contract.md | CANONICAL | Error contract |
 | docs/api/openapi.json | CANONICAL | OpenAPI specification |
 | docs/security/privacy-policy.md | CANONICAL | Privacy policy |
+| docs/security/portal-security.md | CANONICAL | Portal security |
 | docs/operations/deployment.md | CANONICAL | Deployment |
-| docs/operations/core-backup-restore.md | CANONICAL | Backup and restore |
+| docs/operations/core-backup-restore.md | CANONICAL | Backup and restore operations |
+| docs/operations/troubleshooting.md | CANONICAL | Troubleshooting |
+| docs/design/forget-restore-purge.md | CANONICAL | Lifecycle spec (Forget/Restore/Purge) |
 | docs/integration/home-assistant-smoke-test.md | CANONICAL | Home Assistant smoke test |
 
 ## 4. Documentation Structure
@@ -65,6 +73,8 @@ docs/
 │   ├── deployment.md
 │   ├── core-backup-restore.md
 │   └── troubleshooting.md
+├── design/
+│   └── forget-restore-purge.md
 ├── integration/
 │   └── home-assistant-smoke-test.md
 ├── adr/
@@ -91,6 +101,11 @@ samjon-memory/docs/SAMJON_MEMORY_STATUS.md
 | Create memory | PROVEN | API and idempotency tests |
 | CRUD memory operations | PROVEN | Memory tests |
 | Collection lifecycle | PROVEN | Collection tests |
+| Memory activate | PROVEN | Lifecycle tests |
+| Restore (-> draft) | PROVEN | Lifecycle tests |
+| Purge (irreversible, 30-day) | PROVEN | Lifecycle tests |
+| Administration page | PROVEN | Admin portal tests |
+| Dashboard metrics | PROVEN | Dashboard tests |
 | Idempotency | PROVEN | Idempotency tests |
 | Durable manual metadata | PROVEN | Schema evidence |
 | Audit records | PROVEN | Audit tests |

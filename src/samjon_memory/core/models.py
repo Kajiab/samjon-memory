@@ -92,6 +92,31 @@ class CollectionUpdate(BaseModel):
     expected_item_count: Optional[int] = None
 
 
+class CollectionMemoryCreate(BaseModel):
+    """New section payload for Add Section.
+
+    subject/scope are optional; if provided they must match the Collection,
+    otherwise the request is rejected. The section's subject/scope always come
+    from the Collection, never from the title.
+    """
+    title: str = Field(..., min_length=1, max_length=500)
+    raw_content: str = Field(...)
+    memory_type: str = Field(default="fact", max_length=100)
+    subject: Optional[str] = Field(default=None, max_length=500)
+    scope: Optional[str] = Field(default=None, max_length=100)
+    language: str = Field(default="en", max_length=10)
+    sequence_number: Optional[int] = None
+    structured_value_json: Optional[str] = None
+    source: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("raw_content")
+    @classmethod
+    def validate_raw_content(cls, v: str) -> str:
+        if len(v) > 16384:
+            raise ValueError("raw_content exceeds 16384 characters")
+        return v
+
+
 class CollectionResponse(BaseModel):
     collection_id: str
     subject: str

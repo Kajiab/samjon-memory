@@ -11,23 +11,28 @@ Web Portal documentation for Samjon Memory Core V1.
 ## 2. Portal Features
 
 ### Read Access (HTTP Basic Auth)
+- Dashboard (Overview) with metrics and quick actions
 - Memory list/search with pagination and filters
 - Memory detail view
 - Collection list/search with pagination
 - Collection detail with assembled memory preview
 - Validation status display
-- Audit log view
+- Audit log view (summary, filters, pagination)
+- Administration page (forgotten/purged, retention, audit, schema/db status)
 
 ### Admin Access (HTTP Basic Auth)
 - Standalone memory create
 - Standalone memory edit (with expected_version)
+- Standalone memory activate (draft -> active)
 - Guarded supersede and forget
+- Restore forgotten memory/collection (-> draft)
+- Purge forgotten memory/collection (admin, 30-day retention, type PURGE)
 - Collection create (draft state)
 - Collection metadata edit (with expected_version)
 - Collection memory reorder
 - Collection validation
 - Explicit collection activation
-- Add Section to Collection (creates Memory ID automatically)
+- Add Section to Collection (creates Memory ID automatically; the section inherits subject/scope from the Collection, and the form has no subject/scope fields)
 - Move Up / Move Down for Collection sections
 
 ## 3. Authentication
@@ -49,6 +54,7 @@ Web Portal documentation for Samjon Memory Core V1.
 - Exact Origin validation for all mutations
 - Cancel controls are navigation links with no side effects
 - Collection Memories are sorted by sequence_number ASC
+- Collection subject/scope consistency: sections inherit Collection subject/scope, title is the section name, moving an existing Memory requires a matching subject/scope, and a Collection with sections cannot change its subject/scope
 
 ## 5. Boundary Rules
 

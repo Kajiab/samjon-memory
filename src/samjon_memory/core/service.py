@@ -149,6 +149,12 @@ class CoreService:
             raise NotFound(f"Collection not found: {collection_id}")
         if existing.get("purged_at"):
             raise ValidationError("Cannot edit a purged collection")
+        sections = self.memories.list(collection_id=collection_id, limit=1000)
+        if sections and (
+            (data.get("subject") is not None and data.get("subject") != existing.get("subject"))
+            or (data.get("scope") is not None and data.get("scope") != existing.get("scope"))
+        ):
+            raise ValidationError("Cannot change Collection subject/scope while sections exist")
         expected = data.pop("expected_version", None)
         result = self.collections.update(collection_id, data, expected)
         self._audit("collection", collection_id, "collection_update", actor, existing.get("source", ""), result["version"])
@@ -168,10 +174,53 @@ class CoreService:
             raise NotFound(f"Memory not found: {memory_id}")
         if mem.get("purged_at"):
             raise ValidationError("Cannot reuse a purged memory")
+        if mem.get("subject") != coll.get("subject"):
+            raise ValidationError("Memory subject must match the Collection subject")
+        if mem.get("scope") != coll.get("scope"):
+            raise ValidationError("Memory scope must match the Collection scope")
         self.conn.execute("UPDATE memory SET collection_id=?, sequence_number=? WHERE memory_id=?", (collection_id, sequence_number, memory_id))
         self.conn.commit()
         self._audit("collection", collection_id, "collection_structure_change", actor, coll.get("source", ""), coll["version"])
         return {"added": True}
+
+    def add_section_to_collection(self, collection_id, data, actor="system"):
+        """Create a new section Memory whose subject/scope come from the Collection.
+
+        The section `title` is the section name only and is never used as a
+        fallback subject. Any client-provided subject/scope must equal the
+        Collection's values, otherwise the request is rejected.
+        """
+        coll = self.collections.get(collection_id)
+        if not coll:
+            raise NotFound(f"Collection not found: {collection_id}")
+        if coll.get("purged_at"):
+            raise ValidationError("Cannot modify a purged collection")
+        client_subject = data.get("subject")
+        client_scope = data.get("scope")
+        if client_subject is not None and client_subject != coll.get("subject"):
+            raise ValidationError("Section subject must match the Collection subject")
+        if client_scope is not None and client_scope != coll.get("scope"):
+            raise ValidationError("Section scope must match the Collection scope")
+        title = (data.get("title") or "").strip()
+        if not title:
+            raise ValidationError("Section title is required")
+        section = {
+            "subject": coll.get("subject"),
+            "scope": coll.get("scope"),
+            "title": title,
+            "memory_type": data.get("memory_type") or "fact",
+            "raw_content": data.get("raw_content") or "",
+            "structured_value_json": data.get("structured_value_json"),
+            "source": data.get("source") or coll.get("source") or "portal",
+            "language": data.get("language") or coll.get("language") or "en",
+            "collection_id": collection_id,
+        }
+        if data.get("sequence_number") is not None:
+            section["sequence_number"] = data["sequence_number"]
+        created = self.create_memory(section, actor=actor)
+        self._audit("collection", collection_id, "collection_structure_change", actor,
+                    section.get("source", ""), coll["version"])
+        return created
 
     def reorder_collection(self, collection_id, ordered_memory_ids, actor="system"):
         coll = self.collections.get(collection_id)

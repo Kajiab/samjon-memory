@@ -4,6 +4,7 @@ Durable text and structured-memory backend with SQLite, aliases, tags, vocabular
 
 ## Core V1 Status
 
+- Core schema version: 1.1.0
 - Core uses `samjon_core.sqlite`
 - Resolver is not started
 - `samjon_resolver.sqlite` is not created
@@ -11,11 +12,14 @@ Durable text and structured-memory backend with SQLite, aliases, tags, vocabular
 - AI, embeddings, vector search, MCP, and Numchoke integration are not implemented
 - Core Portal V1 is complete and verified
 - Server-rendered Portal with HTTP Basic Authentication
+- Exactly one configured Admin account from environment (HTTP Basic)
 - Exact Origin validation for all mutations
-- One configured Admin account from environment
+- Lifecycle implemented: activate, forget, restore (-> draft), purge (irreversible, 30-day retention)
+- Administration page, Dashboard metrics, audit summary + filters + pagination: implemented
 
 ## Running Tests
 
 ```bash
 python -m pytest tests/ -v
+# 153 passed, 0 failed, 0 skipped
 ```

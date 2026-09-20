@@ -47,8 +47,8 @@ def test_dashboard_stats_counts(service):
     _seed(service)
     draft_coll = service.create_collection({"subject": "cd", "title": "CD", "source": "t"})
     active_coll = service.create_collection({"subject": "ca", "title": "CA", "source": "t"})
-    sec_draft = service.create_memory({"subject": "sec_draft", "raw_content": "c", "source": "t"})
-    sec_active = service.create_memory({"subject": "sec_active", "raw_content": "c", "source": "t"})
+    sec_draft = service.create_memory({"subject": "cd", "raw_content": "c", "source": "t"})
+    sec_active = service.create_memory({"subject": "ca", "raw_content": "c", "source": "t"})
     service.add_memory_to_collection(draft_coll["collection_id"], sec_draft["memory_id"], 1)
     service.add_memory_to_collection(active_coll["collection_id"], sec_active["memory_id"], 1)
     service.activate_collection(active_coll["collection_id"])
@@ -114,15 +114,15 @@ def test_memory_list_scope_standalone(client, temp_db):
     app.state.service = svc
     svc.create_memory({"subject": "stand-alone-name", "raw_content": "c", "source": "t"})
     coll = svc.create_collection({"subject": "col", "title": "Col", "source": "t"})
-    section = svc.create_memory({"subject": "section-name", "raw_content": "c", "source": "t"})
+    section = svc.create_memory({"subject": "col", "title": "section-name", "raw_content": "c", "source": "t"})
     svc.add_memory_to_collection(coll["collection_id"], section["memory_id"], 1)
 
     body = client.get("/portal/memories?scope=standalone").text
     assert "stand-alone-name" in body
-    assert "section-name" not in body
+    assert section["memory_id"] not in body
 
     body2 = client.get("/portal/memories?scope=collection").text
-    assert "section-name" in body2
+    assert section["memory_id"] in body2
     assert "stand-alone-name" not in body2
 
 
@@ -145,12 +145,12 @@ def test_memory_list_active_knowledge(client, temp_db):
     standalone = svc.create_memory({"subject": "know-stand", "raw_content": "c", "source": "t"})
     svc.activate_memory(standalone["memory_id"])
     coll = svc.create_collection({"subject": "col", "title": "Col", "source": "t"})
-    section = svc.create_memory({"subject": "know-draft-section", "raw_content": "c", "source": "t"})
+    section = svc.create_memory({"subject": "col", "title": "know-draft-section", "raw_content": "c", "source": "t"})
     svc.add_memory_to_collection(coll["collection_id"], section["memory_id"], 1)
     # section stays draft -> excluded from active knowledge
     body = client.get("/portal/memories?scope=active_knowledge").text
-    assert "know-stand" in body
-    assert "know-draft-section" not in body
+    assert standalone["memory_id"] in body
+    assert section["memory_id"] not in body
 
 
 def test_collections_invalid_filter(client, temp_db):

@@ -76,8 +76,8 @@ def test_collection_detail_progress_and_preview(client, temp_db):
     coll = svc.create_collection({
         "subject": "prog", "title": "Prog", "source": "t", "expected_item_count": 2,
     })
-    m1 = svc.create_memory({"subject": "Part 1", "raw_content": "hello world", "source": "t"})
-    m2 = svc.create_memory({"subject": "Part 2", "raw_content": "goodbye world", "source": "t"})
+    m1 = svc.create_memory({"subject": "prog", "raw_content": "hello world", "source": "t"})
+    m2 = svc.create_memory({"subject": "prog", "raw_content": "goodbye world", "source": "t"})
     svc.add_memory_to_collection(coll["collection_id"], m1["memory_id"], 1)
     svc.add_memory_to_collection(coll["collection_id"], m2["memory_id"], 2)
     resp = client.get(f"/portal/collections/{coll['collection_id']}")
@@ -111,7 +111,7 @@ def test_activate_enabled_when_valid(client, temp_db):
     coll = svc.create_collection({
         "subject": "ok", "title": "Ok", "source": "t", "expected_item_count": 1,
     })
-    mem = svc.create_memory({"subject": "sec", "raw_content": "c", "source": "t"})
+    mem = svc.create_memory({"subject": "ok", "raw_content": "c", "source": "t"})
     svc.add_memory_to_collection(coll["collection_id"], mem["memory_id"], 1)
     resp = client.get(f"/portal/collections/{coll['collection_id']}")
     assert '<button type="submit" disabled>Activate</button>' not in resp.text

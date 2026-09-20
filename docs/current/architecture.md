@@ -26,9 +26,10 @@ Xiaozhi / Web Chat / API Client
 - **Core service** - Business logic
 - **Database layer** - SQLite with WAL
 - **API layer** - REST endpoints
-- **Portal** - HTML web UI
-- **Security** - Token auth
-- **Audit** - Audit log
+- **Lifecycle** - activate / restore / purge (with audit + tombstones)
+- **Portal** - HTML web UI (incl. Administration page)
+- **Security** - HTTP Basic (Portal) + service tokens (API)
+- **Audit** - Append-only audit log (summary, filters, pagination)
 
 ## 4. Boundaries
 

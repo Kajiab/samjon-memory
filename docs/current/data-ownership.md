@@ -17,5 +17,7 @@ Data ownership and privacy for Samjon Memory Core V1.
 ## 3. Privacy
 
 - Sensitive data is rejected.
-- Audit records redact credentials.
+- Audit records redact credentials and never store full content, request bodies, passwords, or tokens.
+- Audit is append-only (no automatic deletion).
+- Purge hard-erases content; only an identity tombstone (ID, final version, checksum, purge actor/time) and lifecycle audit are retained.
 - No production data in fixtures.
