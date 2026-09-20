@@ -43,6 +43,10 @@ class CoreDatabaseUnavailable(SamjonMemoryError):
     def __init__(self, message="CORE_DATABASE_UNAVAILABLE"):
         super().__init__("CORE_DATABASE_UNAVAILABLE", message, 503)
 
+class ResolverDatabaseUnavailable(SamjonMemoryError):
+    def __init__(self, message="RESOLVER_DATABASE_UNAVAILABLE"):
+        super().__init__("RESOLVER_DATABASE_UNAVAILABLE", message, 503)
+
 class MigrationRequired(SamjonMemoryError):
     def __init__(self, message="MIGRATION_REQUIRED"):
         super().__init__("MIGRATION_REQUIRED", message, 503)

@@ -120,8 +120,11 @@ samjon-memory/docs/SAMJON_MEMORY_STATUS.md
 | Audit records | PROVEN | Audit tests |
 | Web Portal | PROVEN | Portal tests |
 | Backup and restore | PROVEN | Backup tests |
-| FTS5 | PLANNED | Resolver V1 planning; not implemented |
-| Resolver V1 | PLANNED | Planning docs only; no implementation |
+| FTS5 availability check | PROVEN | Resolver fail-fast test (RESOLVER_DATABASE_UNAVAILABLE) |
+| Resolver schema 1.0.0 + migrations | PROVEN | Resolver migration + idempotency tests |
+| Resolver database isolation from Core | PROVEN | Core/Resolver isolation tests |
+| Resolver readiness endpoint | PROVEN | /resolver/ready endpoint test |
+| FTS5 search / projection / rebuild | NOT STARTED | Resolver Foundation B onward |
 | Semantic search | NOT STARTED | Deferred |
 | AI enrichment | NOT STARTED | Deferred |
 | Embeddings/vector search | NOT STARTED | ADR required |
@@ -148,7 +151,7 @@ Update canonical documents for externally visible API, schema, retrieval, migrat
 - [x] Define API and error contracts.
 - [x] Define privacy policy.
 - [x] Define migration and backup/restore operations.
-- [ ] Create Resolver V1 planning documents (SPEC, schema/migrations, ranking/freshness, rebuild/test).
+- [x] Create Resolver V1 planning documents (SPEC, schema/migrations, ranking/freshness, rebuild/test).
 
 ## 10. Approval Checklist
 

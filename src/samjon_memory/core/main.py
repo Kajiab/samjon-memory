@@ -13,6 +13,7 @@ from samjon_memory.api.memories import router as memories_router
 from samjon_memory.api.collections import router as collections_router
 from samjon_memory.api.audit import router as audit_router
 from samjon_memory.portal.router import router as portal_router
+from samjon_memory.resolver.api import router as resolver_router
 from samjon_memory.observability.logging import setup_logging
 
 setup_logging(config.log_level)
@@ -33,6 +34,7 @@ app.include_router(memories_router)
 app.include_router(collections_router)
 app.include_router(audit_router)
 app.include_router(portal_router)
+app.include_router(resolver_router)
 
 
 @app.on_event("startup")

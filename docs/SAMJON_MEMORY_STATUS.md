@@ -20,7 +20,7 @@
 - Dashboard metrics: Implemented
 - Audit summary, filters, pagination: Implemented
 - Manual Portal verification: PASS
-- Resolver: Not started
+- Resolver: Foundation A (schema 1.0.0, readiness)
 - MCP readiness: Not ready
 
 ## Core Baseline
@@ -72,9 +72,15 @@ Required configuration:
 
 ## Resolver
 
-- Status: Not started
-- Resolver database created: No
-- FTS5: Not implemented
+- Status: Foundation A delivered; projection/rebuild/search not started
+- Resolver database (samjon_resolver.sqlite): created, schema 1.0.0
+- FTS5 availability check: Implemented (fail-fast RESOLVER_DATABASE_UNAVAILABLE)
+- Resolver migrations: Implemented and idempotent
+- Resolver schema metadata: Implemented
+- Resolver state + projection-audit foundations: schema only
+- Resolver database isolation from Core: PROVEN by tests
+- Resolver readiness independent of Core: PROVEN; `/resolver/ready` endpoint
+- Not implemented: projection, rebuild, search, ranking, freshness, selective rebuild, Resolver Portal
 - Semantic search: Not implemented
 - AI enrichment: Not implemented
 - Embeddings: Not implemented
@@ -85,7 +91,7 @@ Required configuration:
 All tests pass with executable evidence:
 
 - Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 172
+- Passed: 184
 - Failed: 0
 - Skipped: 0
 - Verified: 2026-09-20
