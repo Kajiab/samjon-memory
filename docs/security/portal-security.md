@@ -11,7 +11,7 @@ Portal security for Samjon Memory Core V1.
 ## 2. Authentication Model
 
 - Exactly one configured household administrator account
-- Configuration: `SAMJON_PORTAL_USERNAME`, `SAMJON_PORTAL_PASSWORD`
+- Configuration: `SAMJON_PORTAL_USERNAME`, `SAMJON_PORTAL_PASSWORD`, `SAMJON_PORTAL_ALLOWED_ORIGINS`
 - HTTP Basic Authentication for all Portal routes
 - Missing/invalid credentials return 401 with `WWW-Authenticate: Basic`
 - No users table, no registration, no custom login page
@@ -23,6 +23,8 @@ Portal security for Samjon Memory Core V1.
 - All Portal mutations validate Origin against `SAMJON_PORTAL_ALLOWED_ORIGINS`
 - Exact scheme+host+port matching
 - Unapproved Origin returns 403
+- `SAMJON_PORTAL_ALLOWED_ORIGINS` parsed as comma-separated list
+- Must not compare Origin against the entire comma-separated string
 
 ## 4. Credential Handling
 

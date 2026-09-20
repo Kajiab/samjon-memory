@@ -1,19 +1,19 @@
 # Samjon Memory Status
 
 **Document ID:** SAMJON-MEMORY-STATUS-001
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Status:** CANONICAL
 **Owner:** Samjon Memory Engineering
-**Last reviewed:** 2026-09-19
+**Last reviewed:** 2026-09-20
 
 ## Current Phase
 
-- Project status: Portal V1 complete, Core V1 verified
-- Current phase: Portal reconstruction complete
+- Project status: Core V1 complete and verified
+- Current phase: Core V1 frozen, Resolver not started
 - Core database schema: V1 frozen
 - Core REST API: V1 frozen
 - CoreService: Implemented
-- Core Portal: Reconstructed and verified
+- Core Portal: Server-rendered, verified
 - Core Freeze overall: Portal V1 verified
 - Resolver: Not started
 - MCP readiness: Not ready
@@ -22,23 +22,24 @@
 
 - Core schema and API are the existing baseline
 - Core migrations, repositories, CoreService, and API contracts are NOT modified
-- Portal is reconstructed with HTTP Basic auth and exact Origin validation
+- Portal is server-rendered with HTTP Basic auth and exact Origin validation
 
 ## Portal Implementation
 
-The Core Portal has been reconstructed with:
+The Core Portal has been verified with:
 
-- one server-rendered Portal
+- One server-rendered Portal
 - FastAPI HTTP Basic Authentication
-- exactly one configured administrator
-- no users table
-- no user registration
-- no custom login page
-- no Portal session cookie
-- no login nonce
-- no multiple Portal users or roles
-- exact Origin validation for mutations
-- no-side-effect Cancel behavior
+- Exactly one configured administrator
+- No users table, no registration, no custom login page
+- No session cookies, no login nonce, no logout tracking
+- No multiple Portal users or roles
+- Exact Origin validation for mutations
+- No-side-effect Cancel behavior
+- Add Section creates Memory ID automatically
+- Collection Memories sorted by sequence_number ASC
+- Move Up / Move Down works correctly
+- Reorder increments Collection version
 
 Required configuration:
 
@@ -72,10 +73,10 @@ Required configuration:
 All tests pass with executable evidence:
 
 - Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 70
+- Passed: 84
 - Failed: 0
 - Skipped: 0
-- Verified commit: 2026-09-19
+- Verified: 2026-09-20
 
 ### Portal Security Tests (11)
 - test_missing_credentials_return_401

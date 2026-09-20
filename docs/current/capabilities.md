@@ -20,7 +20,11 @@ Proven capabilities for Samjon Memory Core V1.
 | Audit | PROVEN | audit_log table |
 | Backup/restore | PROVEN | isolated restore |
 | Sensitive data rejection | PROVEN | credential detection |
-| Web Portal | PROVEN | HTML portal |
+| Web Portal | PROVEN | HTML portal, server-rendered |
+| HTTP Basic Authentication | PROVEN | single admin, env config |
+| Exact Origin validation | PROVEN | SAMJON_PORTAL_ALLOWED_ORIGINS |
+| Add Section auto-generates Memory ID | PROVEN | backend generates ID |
+| Collection Memories sorted by sequence_number ASC | PROVEN | Move Up/Down buttons correct |
 | OpenAPI | PROVEN | drift test |
 
 ## 3. Limitations

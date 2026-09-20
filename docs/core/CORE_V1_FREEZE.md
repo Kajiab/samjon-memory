@@ -8,7 +8,7 @@
 **Freeze approval date:** 2026-09-18
 **Verified commit SHA:** 9ca5d57
 **Exact test command:** `.venv\Scripts\python -m pytest tests/ -v --tb=short`
-**Test result:** 34 passed, 0 failed
+**Test result:** 84 passed, 0 failed
 **OpenAPI drift result:** PASS
 **Backup and isolated restore result:** PASS
 **Resolver status:** Not started

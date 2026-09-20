@@ -9,6 +9,10 @@ Durable text and structured-memory backend with SQLite, aliases, tags, vocabular
 - `samjon_resolver.sqlite` is not created
 - FTS5 is planned for Resolver, not implemented in Core
 - AI, embeddings, vector search, MCP, and Numchoke integration are not implemented
+- Core Portal V1 is complete and verified
+- Server-rendered Portal with HTTP Basic Authentication
+- Exact Origin validation for all mutations
+- One configured Admin account from environment
 
 ## Running Tests
 

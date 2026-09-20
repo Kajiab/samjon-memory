@@ -27,12 +27,14 @@ Web Portal documentation for Samjon Memory Core V1.
 - Collection memory reorder
 - Collection validation
 - Explicit collection activation
+- Add Section to Collection (creates Memory ID automatically)
+- Move Up / Move Down for Collection sections
 
 ## 3. Authentication
 
 - HTTP Basic Authentication for all Portal routes
 - Exactly one configured household administrator account
-- Configuration: `SAMJON_PORTAL_USERNAME`, `SAMJON_PORTAL_PASSWORD`
+- Configuration: `SAMJON_PORTAL_USERNAME`, `SAMJON_PORTAL_PASSWORD`, `SAMJON_PORTAL_ALLOWED_ORIGINS`
 - No users table, no registration, no custom login page
 - No session cookies, no login nonce, no logout tracking
 - No multiple Portal users or roles
@@ -46,6 +48,7 @@ Web Portal documentation for Samjon Memory Core V1.
 - Validation and activation feedback
 - Exact Origin validation for all mutations
 - Cancel controls are navigation links with no side effects
+- Collection Memories are sorted by sequence_number ASC
 
 ## 5. Boundary Rules
 
