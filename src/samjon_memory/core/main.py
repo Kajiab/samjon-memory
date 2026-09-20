@@ -2,9 +2,8 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from samjon_memory.config import config
 from samjon_memory.core.service import CoreService
@@ -47,14 +46,3 @@ app.mount(
     StaticFiles(directory=STATIC_DIR),
     name="portal-static",
 )
-
-
-@app.get("/portal/", include_in_schema=False)
-async def portal_index():
-    return FileResponse(STATIC_DIR / "index.html")
-
-
-@app.on_event("startup")
-async def startup():
-    service = CoreService()
-    app.state.service = service

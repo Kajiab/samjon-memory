@@ -12,7 +12,7 @@ def get_connection(database_path: Optional[str] = None) -> sqlite3.Connection:
     """Get a SQLite connection with Core pragmas configured."""
     path = database_path or config.database_path
     try:
-        conn = sqlite3.connect(path, timeout=10)
+        conn = sqlite3.connect(path, timeout=10, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         for pragma in SQLITE_PRAGMAS:
             conn.execute(pragma)

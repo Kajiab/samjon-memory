@@ -23,7 +23,6 @@ src/samjon_memory/core/repositories.py
 src/samjon_memory/core/service.py
 src/samjon_memory/observability/__init__.py
 src/samjon_memory/observability/logging.py
-src/samjon_memory/portal/__init__.py
 src/samjon_memory/portal/pages.py
 src/samjon_memory/portal/router.py
 src/samjon_memory/security/__init__.py
@@ -41,4 +40,5 @@ tests/test_memory.py
 tests/test_migration.py
 tests/test_openapi_drift.py
 tests/test_portal.py
+tests/test_portal_security.py
 tests/test_sensitive.py

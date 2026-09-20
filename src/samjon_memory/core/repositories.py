@@ -142,7 +142,8 @@ class MemoryRepo:
     def list(self, subject=None, memory_type=None, scope=None, status=None,
              source=None, collection_id=None, durable_user_tag=None,
              created_after=None, created_before=None,
-             updated_after=None, updated_before=None, limit=20, offset=0):
+             updated_after=None, updated_before=None, limit=20, offset=0,
+             order_by=None):
         query = "SELECT m.* FROM memory m WHERE 1=1"
         params = []
         if subject:
@@ -178,7 +179,11 @@ class MemoryRepo:
         if updated_before:
             query += " AND m.updated_at<=?"
             params.append(updated_before)
-        query += " ORDER BY m.updated_at DESC LIMIT ? OFFSET ?"
+        if order_by:
+            query += f" ORDER BY {order_by}"
+        else:
+            query += " ORDER BY m.updated_at DESC"
+        query += " LIMIT ? OFFSET ?"
         params.extend([limit, offset])
         rows = self.conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]

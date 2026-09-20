@@ -8,20 +8,37 @@
 
 Portal security for Samjon Memory Core V1.
 
-## 2. Security
+## 2. Authentication Model
 
-- X-Service-Token header for read access
-- X-Admin-Token header for write access
-- CSRF protection via SameSite=Strict cookies (portal_csrf)
-- Token validation before portal access
-- Admin authorization for all mutations
-- Read/admin permission separation
+- Exactly one configured household administrator account
+- Configuration: `SAMJON_PORTAL_USERNAME`, `SAMJON_PORTAL_PASSWORD`
+- HTTP Basic Authentication for all Portal routes
+- Missing/invalid credentials return 401 with `WWW-Authenticate: Basic`
+- No users table, no registration, no custom login page
+- No session cookies, no login nonce, no logout tracking
+- No multiple Portal users or roles
 
-## 3. Protection Mechanisms
+## 3. Origin Validation
 
-- CSRF token generated per request and stored in SameSite=Strict cookie
-- All mutating endpoints require admin token
-- No direct database access by portal handlers
-- XSS-safe HTML rendering via escape_html
-- Version conflict detection on edits
-- Validation feedback on collection operations
+- All Portal mutations validate Origin against `SAMJON_PORTAL_ALLOWED_ORIGINS`
+- Exact scheme+host+port matching
+- Unapproved Origin returns 403
+
+## 4. Credential Handling
+
+- Credentials come from trusted configuration
+- Never appear in HTML, JavaScript, URLs, logs, audit, or capabilities
+- Synthetic values in tests
+
+## 5. Portal Security Tests
+
+- Missing credentials return 401
+- WWW-Authenticate Basic present
+- Invalid username rejected
+- Invalid password rejected
+- Valid credentials allow access
+- All authenticated routes require credentials
+- Unapproved Origin rejected on mutations
+- Approved Origin succeeds on mutations
+- Credentials absent from HTML and capabilities
+- Cancel creates no mutation or audit event

@@ -1,104 +1,117 @@
-# Samjon Memory Status - Samjon Memory Core V1
+# Samjon Memory Status
 
 **Document ID:** SAMJON-MEMORY-STATUS-001
-**Version:** 1.0.0
-**Status:** CANONICAL — FROZEN BASELINE APPROVED
+**Version:** 2.0.0
+**Status:** CANONICAL
 **Owner:** Samjon Memory Engineering
-**Last reviewed:** 2026-09-18
+**Last reviewed:** 2026-09-19
 
-## 1. Purpose
+## Current Phase
 
-Detailed current implementation status for Samjon Memory Core V1.
+- Project status: Portal V1 complete, Core V1 verified
+- Current phase: Portal reconstruction complete
+- Core database schema: V1 frozen
+- Core REST API: V1 frozen
+- CoreService: Implemented
+- Core Portal: Reconstructed and verified
+- Core Freeze overall: Portal V1 verified
+- Resolver: Not started
+- MCP readiness: Not ready
 
-## 2. Current Status
+## Core Baseline
 
-- **Lifecycle:** ACTIVE DEVELOPMENT
-- **Project status:** In development
-- **Current phase:** Core V1 frozen
-- **Core implementation:** Implemented
-- **Core schema:** V1 frozen
-- **Core API:** V1 frozen
-- **Core Portal:** Implemented
-- **Core Freeze:** FROZEN
-- **Resolver:** Not started
-- **MCP readiness:** Not ready
-- **Next approved phase:** Resolver V1 design and implementation
-- **Core schema version:** 1.0.0 (SQLite)
-- **Core API version:** 1.0.0
-- **Freeze approval date:** 2026-09-18
-- **Verified commit SHA:** 9ca5d57
-- **Exact test command:** `.venv\Scripts\python -m pytest tests/ -v --tb=short`
-- **Test result:** 34 passed, 0 failed
-- **OpenAPI drift result:** PASS
-- **Backup and isolated restore result:** PASS
-- **Resolver status:** Not started
+- Core schema and API are the existing baseline
+- Core migrations, repositories, CoreService, and API contracts are NOT modified
+- Portal is reconstructed with HTTP Basic auth and exact Origin validation
 
-## 3. Proven Capabilities
+## Portal Implementation
 
-| Capability | Evidence | Status |
-|---|---|---|
-| SQLite schema and migrations | tests/test_migration.py | PROVEN |
-| Create memory | tests/test_memory.py | PROVEN |
-| CRUD memory operations | tests/test_memory.py | PROVEN |
-| Collection lifecycle | tests/test_collection.py | PROVEN |
-| Idempotency | tests/test_idempotency.py | PROVEN |
-| Durable manual metadata | schema | PROVEN |
-| Audit records | tests/test_audit.py | PROVEN |
-| Web Portal | tests/test_portal.py | PROVEN |
-| Backup and restore | tests/test_backup.py | PROVEN |
-| Sensitive data rejection | tests/test_sensitive.py | PROVEN |
-| OpenAPI drift | tests/test_openapi_drift.py | PROVEN |
-| Independent collection-memory editing | tests/test_collection_memory_edit.py | PROVEN |
-| Portal boundary verification | tests/test_portal.py | PROVEN |
-| Authenticated Portal | tests/test_portal.py | PROVEN |
-| Admin authorization | tests/test_portal.py | PROVEN |
-| CSRF protection | tests/test_portal.py | PROVEN |
-| XSS-safe rendering | tests/test_portal.py | PROVEN |
+The Core Portal has been reconstructed with:
 
-## 4. Not Implemented
+- one server-rendered Portal
+- FastAPI HTTP Basic Authentication
+- exactly one configured administrator
+- no users table
+- no user registration
+- no custom login page
+- no Portal session cookie
+- no login nonce
+- no multiple Portal users or roles
+- exact Origin validation for mutations
+- no-side-effect Cancel behavior
 
-- FTS5
-- Resolver/FTS5/embeddings/MCP/AI code
-- Semantic search
-- AI enrichment
+Required configuration:
 
-## 5. Freeze Gates
+- `SAMJON_PORTAL_USERNAME`
+- `SAMJON_PORTAL_PASSWORD`
+- `SAMJON_PORTAL_ALLOWED_ORIGINS`
 
-- [x] Core database exists and is SQLite (samjon_core.sqlite)
-- [x] Core schema versioned in schema_metadata
-- [x] Core memory CRUD tested
-- [x] Collection CRUD tested
-- [x] Durable manual metadata fields exist
-- [x] No resolver/FTS5/embeddings/MCP/AI code in Core
-- [x] Auth and backup tested
-- [x] No external database access
-- [x] Independent collection-memory editing proven (regression test)
-- [x] Portal boundary verified (portal tests)
+## Portal Status
 
-## 6. Test Summary
+- Server-rendered Portal: Implemented (18 routes)
+- HTTP Basic authentication: Verified by tests
+- Exact Origin validation: Verified by tests
+- Memory Portal workflow: Verified by tests
+- Collection Portal workflow: Verified by tests
+- Cancel behavior: Verified by tests
+- Portal security tests: All passing
+- Capability reporting: Verified by tests
 
-- **43 tests passing**
-- **0 tests failing**
-- **2 new regression tests added:**
-  - `test_collection_memory_edit.py::test_independent_collection_memory_edit`
-  - `test_collection_memory_edit.py::test_collection_memory_edit_conflict`
+## Resolver
 
-## 7. Open Items
+- Status: Not started
+- Resolver database created: No
+- FTS5: Not implemented
+- Semantic search: Not implemented
+- AI enrichment: Not implemented
+- Embeddings: Not implemented
+- MCP implementation: Not implemented
 
-- None for Core V1.
+## Test Evidence
 
-## 8. Evidence Summary
+All tests pass with executable evidence:
 
-- Migration tests pass
-- Memory tests pass
-- Collection tests pass
-- Idempotency tests pass
-- Audit tests pass
-- Backup tests pass
-- Sensitive data tests pass
-- Portal tests pass
-- OpenAPI drift test passes
-- Independent collection-memory editing regression test passes
-- Portal boundary verification passes
-- 34/34 tests pass in .venv Python
-- Commit: 9ca5d57
+- Command: `python -m pytest tests/ -v --tb=short`
+- Passed: 70
+- Failed: 0
+- Skipped: 0
+- Verified commit: 2026-09-19
+
+### Portal Security Tests (11)
+- test_missing_credentials_return_401
+- test_www_authenticate_basic_present
+- test_invalid_username_rejected
+- test_invalid_password_rejected
+- test_valid_credentials_allow_access
+- test_authenticated_routes_require_credentials (4 routes)
+- test_unapproved_origin_rejected_on_mutation
+- test_approved_origin_succeeds_on_mutation
+- test_credentials_absent_from_html
+- test_credentials_absent_from_capabilities
+- test_cancel_create_memory_no_mutation
+- test_xss_safe_rendering
+
+### Portal Functional Tests (27)
+- test_memory_list_empty
+- test_memory_list_shows_created
+- test_memory_detail
+- test_memory_detail_not_found
+- test_memory_create_form
+- test_memory_create_submission
+- test_memory_edit_form
+- test_memory_edit_submission
+- test_memory_supersede
+- test_memory_forget
+- test_collection_list_empty
+- test_collection_create_form
+- test_collection_create_submission
+- test_collection_detail
+- test_collection_edit_form
+- test_collection_edit_submission
+- test_collection_add_memory
+- test_collection_reorder
+- test_collection_activate
+- test_audit_log
+- test_edit_version_conflict_shown
+- test_cancel_create_memory_link
+- test_independent_collection_memory_edit

@@ -1,40 +1,31 @@
 # AGENTS.md: Samjon Memory Developer Context
 
-**Document ID:** SAMJON-MEMORY-AGENT-001  
-**Version:** 2.0.0  
-**Status:** Canonical repository instruction  
-**Owner:** Samjon Memory Engineering  
-**Approver:** Jeab  
-**Last reviewed:** 2026-09-16  
+**Document ID:** SAMJON-MEMORY-AGENT-001
+**Version:** 2.1.0
+**Status:** Canonical repository instruction
+**Owner:** Samjon Memory Engineering
+**Approver:** Jeab
+**Last reviewed:** 2026-09-18
 **Repository:** `samjon-memory`
 
 ---
 
 ## 1. Purpose
 
-This file is the mandatory working guide for Cline and other AI coding agents when reading, designing, editing, testing, or reviewing Samjon Memory.
+This file is the mandatory working guide for Cline and other coding agents when reading, designing, editing, testing, or reviewing Samjon Memory.
 
-Read this file before making any change.
+Read this file before changing the repository.
 
-Also read:
 
-```text
-HomeAI/AGENTS.md
-HomeAI/docs/DOCUMENT_INDEX.md
-HomeAI/docs/PROJECT_STATUS.md
-HomeAI/docs/standards/BACKEND_TO_MCP_MODULE_STANDARD.md
-HomeAI/samjon-memory/docs/DOCUMENT_INDEX.md
-```
 
-The cross-project architecture is defined under:
+This repository-local `AGENTS.md` is sufficient for ordinary implementation
+tasks.
 
-```text
-HomeAI/docs/blueprints/
-```
+Do not search parent directories for umbrella instructions.
 
-Project-level instructions may add stricter rules but may not weaken HomeAI umbrella rules.
+Cross-project rules are read only in a separate integration task.
 
-If instructions, implementation, tests, schemas, or canonical documents conflict, report the conflict with exact file references before editing.
+When implementation, tests, schemas, or canonical documents conflict, report the exact conflict before changing externally visible behavior.
 
 ---
 
@@ -51,59 +42,55 @@ It stores explicit, structured, text-based knowledge such as:
 - Plant, inventory, and equipment knowledge.
 - User-confirmed facts.
 
-Samjon Memory uses two physically separate SQLite databases from the initial implementation:
+Samjon Memory uses two physically separate SQLite databases:
 
 ```text
 samjon_core.sqlite
-= authoritative durable facts
+= authoritative, durable, backup-critical facts
 
 samjon_resolver.sqlite
 = derived, disposable, rebuildable search projections
 ```
 
-The initial service may run Core and Resolver in one process on one REST port, but the databases, schemas, migrations, repositories, backup policies, and lifecycle remain separate.
+Core and Resolver may run in one service process on REST port `8100`, but their database files, schemas, migrations, repositories, backup policies, and lifecycle remain separate.
 
 ---
 
 ## 3. Canonical Architecture
 
 ```text
-Numchoke or Xiaozhi
-        |
-        v
-Samjon Home MCP
-  Samjon module
-        |
-        v
-Samjon Memory REST API :8100
-        |
-        +-----------------------------+
-        |                             |
-        v                             v
-Core Memory                     Resolver
-Authoritative facts             Derived projections
-samjon_core.sqlite              samjon_resolver.sqlite
+Numchoke or another approved client
+                |
+                v
+        Samjon Home MCP
+          Samjon module
+                |
+                v
+   Samjon Memory REST API :8100
+                |
+        +-------+--------+
+        |                |
+        v                v
+ Core Memory          Resolver
+ authoritative        derived
+ samjon_core.sqlite   samjon_resolver.sqlite
 ```
 
 Projection flow is one-way:
 
 ```text
-Core API / Core service
-        |
-        v
-Projection builder
-        |
-        v
-Resolver database
+Core service/API
+    -> projection builder
+    -> Resolver database
 ```
 
 Rules:
 
 - Resolver must not write facts into Core.
-- External services must not access either SQLite file directly.
-- Search results resolve IDs through Resolver, then load authoritative facts through Core.
-- Resolver may be deleted and rebuilt without loss of authoritative information.
-- Samjon Memory does not implement MCP, OpenRouter conversation loops, Home Assistant control, Numchai playback, or Numsub rules.
+- External services must not open either SQLite file directly.
+- Resolver may return matches and evidence, but authoritative fact content is loaded from Core.
+- Resolver may be deleted and rebuilt without losing authoritative information.
+- Samjon Memory does not implement MCP, Numchoke conversation logic, Numchai playback, Home Assistant control, or Numsub rules.
 
 ---
 
@@ -111,93 +98,85 @@ Rules:
 
 ### 4.1 Phase 1: Core Memory V1
 
-Develop Core first until its schema and API are stable and frozen.
-
-Core Phase 1 includes:
+Core V1 includes:
 
 - Typed configuration.
-- Core SQLite connection and pragmas.
-- Explicit Core migrations.
-- Fact creation with idempotency.
-- Fact retrieval by ID.
-- Bounded deterministic Core query by metadata.
+- Core SQLite connection and explicit migrations.
+- Standalone Memory lifecycle.
+- Collection and Collection Memory lifecycle.
+- Idempotent creation.
+- Deterministic metadata query.
 - Versioning and supersession.
-- Administrative forget lifecycle.
-- Authentication and subject authorization.
+- Guarded forget behavior.
 - Sensitive-data rejection.
 - Audit records.
-- Backup and restore validation.
-- Core Web Portal pages.
-- Core OpenAPI and tests.
+- Backup and isolated restore.
+- Core REST API and OpenAPI.
+- Core Web Portal.
 
-Core Phase 1 excludes:
+Core V1 excludes:
 
-- FTS5 search.
+- Resolver database.
+- FTS5.
+- Semantic search.
 - AI enrichment.
-- Derived aliases and semantic tags.
 - Embeddings or vector search.
-- Resolver ranking.
-- Samjon Home MCP module.
+- MCP implementation.
 
 ### 4.2 Core Freeze Gate
 
-Core is frozen as V1 when:
+Core V1 may be frozen only when:
 
-- [ ] Core schema migration tests pass.
-- [ ] Core API tests pass.
-- [ ] Idempotency tests pass.
-- [ ] Version and supersession tests pass.
-- [ ] Authentication and subject isolation tests pass.
-- [ ] Sensitive-data policy tests pass.
-- [ ] Backup and isolated restore tests pass.
-- [ ] Core Web Portal uses only supported APIs.
-- [ ] OpenAPI matches runtime behavior.
-- [ ] Canonical documentation matches implementation.
-- [ ] Known limitations are explicit.
+- Core migrations and migration idempotency pass.
+- Core API tests pass.
+- Memory and Collection lifecycle tests pass.
+- Independent Collection Memory editing is proven.
+- Idempotency tests pass.
+- Version and supersession tests pass.
+- Sensitive-data policy tests pass.
+- Core Portal behavior and security tests pass.
+- Backup and isolated restore pass.
+- OpenAPI matches runtime behavior.
+- Canonical documentation matches the implementation.
+- Known limitations are explicit.
+- Owner approval is recorded.
 
-Freeze means contract changes require versioning. It does not prohibit bug fixes.
+Freeze means incompatible schema or API changes require a new version. It does not prohibit bug fixes, security fixes, tests, or documentation corrections.
 
 ### 4.3 Phase 2: Resolver V1
 
-Begin Resolver implementation only after Core V1 is frozen and contains representative test data.
+Resolver implementation begins only after Core V1 is frozen and contains representative data.
 
-Resolver Phase 2 includes:
+Resolver V1 may include:
 
 - Separate Resolver SQLite connection and migrations.
-- Projection builder reading Core through an approved service/API boundary.
-- Normalized search text.
-- FTS5 projection.
+- Projection builder reading Core through an approved service or API boundary.
+- Normalized text and FTS5.
 - Derived aliases and tags.
 - Vocabulary resolution.
 - Deterministic ranking and match reasons.
+- Collection-level and Memory-level intent search.
 - Bounded context retrieval.
-- Stale projection detection.
-- Full and selective rebuild.
-- Atomic resolver replacement.
-- Resolver Web Portal pages.
-- Resolver OpenAPI and tests.
+- Projection freshness.
+- Selective rebuild.
+- Atomic full rebuild and rollback.
+- Resolver Portal pages.
 
 ### 4.4 Phase 3: Samjon Home MCP Module
 
-After Core and Resolver APIs are final-test quality:
+After Core and Resolver APIs reach final-test quality:
 
 ```text
 Final Samjon Memory API
--> thin Samjon Home MCP module
--> module tests
--> live compatibility tests
--> consumer tests
--> contract freeze
--> publish to home-ai-contracts
+    -> thin Samjon Home MCP module
+    -> module tests
+    -> live compatibility tests
+    -> consumer tests
+    -> contract freeze
+    -> publish to home-ai-contracts
 ```
 
-Follow:
-
-```text
-HomeAI/docs/standards/BACKEND_TO_MCP_MODULE_STANDARD.md
-```
-
-Do not implement the MCP module inside this repository.
+The MCP module belongs in the Samjon Home MCP repository, not here.
 
 ---
 
@@ -205,17 +184,16 @@ Do not implement the MCP module inside this repository.
 
 ### 5.1 Core is authoritative
 
-`samjon_core.sqlite` is the source of truth for durable memory.
+`samjon_core.sqlite` is the source of truth for durable Memory.
 
 Core owns:
 
 - Fact identity.
 - Raw user-confirmed content.
-- Structured value.
+- Structured values.
 - Subject, type, and scope.
 - Source and provenance.
-- User-confirmed aliases and vocabulary that must survive Resolver rebuild.
-- Manual overrides.
+- Durable manual aliases, vocabulary, tags, and overrides.
 - Version and supersession.
 - Lifecycle status.
 - Idempotency records.
@@ -223,66 +201,51 @@ Core owns:
 
 Core facts are never silently overwritten.
 
-### 5.2 Resolver is derived and disposable
+### 5.2 Resolver is derived
 
-`samjon_resolver.sqlite` contains rebuildable projections.
+`samjon_resolver.sqlite` stores rebuildable projections only.
 
-Resolver may contain:
+Derived content may include:
 
 - Normalized text.
-- Search text.
-- FTS5 indexes.
-- Derived aliases.
-- Derived semantic tags.
-- Projection state.
+- FTS5 documents.
+- Derived aliases and tags.
 - Ranking metadata.
-- AI-generated search enrichment in a future approved phase.
-- Embeddings in a future approved phase.
+- Projection state.
+- Future approved AI enrichment or embeddings.
 
-Deleting Resolver must not delete authoritative user information.
+Anything that must survive a complete Resolver rebuild belongs in Core.
 
-### 5.3 Manual durable metadata belongs in Core
+### 5.3 REST is the external boundary
 
-Anything that must survive complete Resolver deletion belongs in Core.
+External systems use documented REST APIs.
 
-Examples:
+The Portal may call the same Core application-service operations used by REST handlers. It does not need to make an HTTP request back into the same process.
 
-```text
-User-confirmed alias
-User-confirmed vocabulary
-Manual correction
-Manual classification
-Explicit user tag that carries durable meaning
-```
+Portal handlers must not access SQLite connections, repositories, arbitrary SQL, or database paths directly.
 
-Resolver duplicates these only as search projections.
+### 5.4 Conversation history is not Memory
 
-### 5.4 REST API is the external boundary
+Conversation history is not stored automatically as durable Memory.
 
-External systems call documented Samjon Memory APIs.
+Durable Memory is created only when:
 
-Do not allow Samjon Home MCP, Numchoke, the Web Portal, scripts, or other services to open either SQLite file directly.
-
-### 5.5 Conversation history is not durable memory
-
-A conversation transcript is not automatically stored as memory.
-
-Create durable memory only when:
-
-- The user explicitly asks to remember it.
+- The user explicitly requests it.
 - An approved workflow confirms it.
 - Subject and source are recorded.
 
-### 5.6 Retrieval returns evidence
+### 5.5 Retrieval returns evidence
 
-Resolver responses return bounded structured results with:
+Resolver results must be bounded and identify:
 
-- Memory ID.
+- Memory or Collection identity.
 - Core version.
+- Projected Core version.
+- Projection freshness.
 - Score.
 - Match reasons.
 - Conflicts.
-- Projection freshness.
+- Result type.
 
 Numchoke owns the final conversational answer.
 
@@ -293,268 +256,260 @@ Numchoke owns the final conversational answer.
 Do not add without an accepted ADR:
 
 - MCP transport or MCP tool registration.
-- Direct OpenRouter or other LLM calls in Core V1.
-- Automatic extraction from every conversation.
+- Direct OpenRouter or LLM calls in Core.
+- Automatic Memory extraction from every conversation.
 - Vector database or embeddings.
 - Autonomous fact deletion.
 - Direct database access from another service.
 - Browser-side SQLite access.
 - Raw Home Assistant state mirroring.
 - Numchai playback logic.
-- Numsub event ingestion at sensor frequency.
-- Security codes, passwords, tokens, private keys, biometrics, or raw audio storage.
-- Public unauthenticated APIs or Web Portal.
+- Numsub high-frequency event ingestion.
+- Credentials, tokens, private keys, security codes, recovery keys, biometrics, or raw audio as Memory.
+- Public internet exposure of the Portal.
+- Portal user registration or a users table.
 
 ---
 
-## 7. Source of Truth
+## 7. Authority Order
 
-Authority order:
+When sources conflict, use this order:
 
-1. Executable migration, API, security, portal, backup, restore, projection, and retrieval tests.
+1. Executable migration, API, Portal, security, backup, restore, projection, and retrieval tests.
 2. Current implementation.
 3. Generated OpenAPI and schema exports.
 4. Accepted ADRs.
-5. Canonical documents.
-6. Supporting documents.
+5. Canonical documentation.
+6. Supporting documentation.
 7. Historical reports and drafts.
 
-When documentation conflicts with code or tests, report exact file and line references before changing either.
+Do not let a historical plan override current executable evidence.
 
 ---
 
-## 8. Recommended Repository Structure
+## 8. Repository Structure
 
 ```text
 samjon-memory/
 ├── README.md
 ├── AGENTS.md
 ├── pyproject.toml
-├── uv.lock
-├── Dockerfile
-├── compose.example.yml
+├── .env.example
+├── .gitignore
 ├── src/
 │   └── samjon_memory/
-│       ├── __init__.py
-│       ├── samjon_memory_main.py
-│       ├── samjon_memory_config.py
-│       ├── samjon_memory_lifecycle.py
-│       ├── core/
-│       │   ├── api/
-│       │   │   ├── core_memory_api.py
-│       │   │   ├── core_query_api.py
-│       │   │   ├── core_admin_api.py
-│       │   │   └── core_api_schemas.py
-│       │   ├── services/
-│       │   │   ├── core_memory_service.py
-│       │   │   └── core_lifecycle_service.py
-│       │   ├── repositories/
-│       │   │   ├── core_memory_repository.py
-│       │   │   ├── core_alias_repository.py
-│       │   │   ├── core_vocabulary_repository.py
-│       │   │   ├── core_idempotency_repository.py
-│       │   │   └── core_audit_repository.py
-│       │   └── database/
-│       │       ├── core_database.py
-│       │       ├── core_schema.py
-│       │       ├── core_migrations.py
-│       │       └── migrations/
-│       ├── resolver/
-│       │   ├── api/
-│       │   │   ├── resolver_search_api.py
-│       │   │   ├── resolver_context_api.py
-│       │   │   ├── resolver_vocabulary_api.py
-│       │   │   ├── resolver_admin_api.py
-│       │   │   └── resolver_api_schemas.py
-│       │   ├── services/
-│       │   │   ├── resolver_search_service.py
-│       │   │   ├── resolver_projection_service.py
-│       │   │   └── resolver_rebuild_service.py
-│       │   ├── repositories/
-│       │   │   ├── resolver_projection_repository.py
-│       │   │   ├── resolver_alias_repository.py
-│       │   │   ├── resolver_tag_repository.py
-│       │   │   └── resolver_vocabulary_repository.py
-│       │   ├── retrieval/
-│       │   │   ├── resolver_query_normalizer.py
-│       │   │   ├── resolver_fts_search.py
-│       │   │   ├── resolver_ranker.py
-│       │   │   └── resolver_conflict_detector.py
-│       │   └── database/
-│       │       ├── resolver_database.py
-│       │       ├── resolver_schema.py
-│       │       ├── resolver_migrations.py
-│       │       └── migrations/
-│       ├── portal/
-│       │   ├── portal_routes.py
-│       │   ├── portal_auth.py
-│       │   └── static/
-│       │       ├── index.html
-│       │       ├── portal.js
-│       │       └── portal.css
+│       ├── config.py
+│       ├── constants.py
+│       ├── errors.py
 │       ├── api/
-│       │   ├── health_api.py
-│       │   ├── capability_api.py
-│       │   └── common_api_schemas.py
+│       ├── core/
+│       │   ├── database.py
+│       │   ├── migration.py
+│       │   ├── models.py
+│       │   ├── repositories.py
+│       │   ├── service.py
+│       │   └── main.py
+│       ├── resolver/
+│       │   └── future implementation
+│       ├── portal/
+│       │   ├── router.py
+│       │   ├── pages.py
+│       │   └── static/
 │       ├── security/
-│       │   ├── authentication.py
-│       │   ├── authorization.py
-│       │   ├── sensitive_data.py
-│       │   ├── csrf.py
-│       │   └── redaction.py
 │       ├── observability/
-│       │   ├── logging.py
-│       │   ├── metrics.py
-│       │   └── audit.py
 │       └── shared/
-│           ├── errors.py
-│           ├── ids.py
-│           ├── normalization.py
-│           └── result.py
 ├── tests/
-│   ├── core/
-│   ├── resolver/
-│   ├── portal/
-│   ├── api/
-│   ├── migration/
-│   ├── security/
-│   ├── backup_restore/
-│   └── integration/
 ├── docs/
 ├── artifacts/
 └── scripts/
 ```
 
-Use project-prefixed or layer-specific filenames consistently.
+Use `src/samjon_memory/` as the top-level Python package. Do not create a separate `src/samjon_core/` application.
 
 ---
 
-## 9. Database Files and Configuration
+## 9. Database Configuration
 
-Default logical configuration:
+Expected configuration:
 
 ```text
-SAMJON_CORE_DATABASE_PATH=/data/samjon_core.sqlite
-SAMJON_RESOLVER_DATABASE_PATH=/data/samjon_resolver.sqlite
+SAMJON_CORE_DATABASE_PATH
+SAMJON_RESOLVER_DATABASE_PATH
 ```
 
 Rules:
 
 - Paths are configurable.
-- Production paths are not hard-coded.
-- Database files use separate connections.
-- Each database has independent `schema_meta` and migrations.
-- Core and Resolver schema versions are reported separately.
-- Foreign keys are enabled for every connection.
-- WAL and busy timeout are configured deliberately and tested.
-- Resolver database can be replaced while Core remains intact.
+- Local development may use `./data/samjon_core.sqlite`.
+- Container deployment may explicitly use `/data/samjon_core.sqlite`.
+- Parent directories may be created only from trusted application configuration.
+- Each database has independent schema metadata and migrations.
+- Foreign keys are enabled.
+- WAL and busy timeout are deliberate and tested.
+- Resolver replacement must not affect Core.
+- API or Portal input must never supply a database path.
 
 ---
 
 ## 10. Core Data Model
 
-Core facts should support these fields or approved equivalents:
+Core supports standalone Memories and Collections.
+
+### 10.1 Memory
+
+Required concepts:
 
 ```text
 memory_id
+collection_id, nullable
+sequence_number, nullable
 subject
 memory_type
 scope
+title, nullable
+section_path, nullable
 raw_content
-structured_value_json
+structured_value_json, nullable
 source
 language
 status
 version
-supersedes_memory_id
+supersedes_memory_id, nullable
+content_checksum
 created_at
 updated_at
 ```
 
-Core supporting tables should cover:
+Memory statuses:
 
 ```text
-core_memory_alias
-core_vocabulary
-core_memory_tag
-core_idempotency
-core_audit
-schema_meta
+draft
+active
+superseded
+forgotten
 ```
 
-Rules:
+### 10.2 Collection
 
-- IDs are server-generated and stable.
-- Subject is explicit.
-- Memory type and scope use approved values.
-- Raw content preserves the confirmed statement.
-- Structured value stores typed facts when useful.
-- Superseded and forgotten facts remain auditable according to policy.
-- Manual metadata is not overwritten by derived data.
-- Schema changes require explicit migrations and tests.
+Required concepts:
+
+```text
+collection_id
+subject
+collection_type
+scope
+title
+summary
+language
+source
+source_reference
+status
+version
+supersedes_collection_id
+expected_item_count
+content_checksum
+created_at
+updated_at
+```
+
+Collection statuses:
+
+```text
+draft
+active
+superseded
+forgotten
+```
+
+### 10.3 Durable manual metadata
+
+Core owns durable information that must survive Resolver rebuild:
+
+- User-confirmed aliases.
+- User-confirmed vocabulary.
+- Durable user tags.
+- Manual corrections and overrides.
+
+AI-derived aliases, semantic tags, ranking state, FTS5, and embeddings belong in Resolver.
 
 ---
 
-## 11. Resolver Data Model
+## 11. Memory versus Collection Decision Rule
 
-Resolver should support these fields or approved equivalents:
+The creating user or approved client explicitly chooses:
 
-```text
-resolver_projection
-- memory_id
-- core_version
-- normalized_text
-- search_text
-- projection_version
-- generated_by
-- confidence
-- projection_status
-- indexed_at
+- Standalone Memory, or
+- Collection containing independently managed Memories.
 
-resolver_alias
-- memory_id
-- alias
-- normalized_alias
-- source
-- priority
+Core must not infer or silently change the storage type.
 
-resolver_tag
-- memory_id
-- tag
-- normalized_tag
-- source
-- confidence
+Use Standalone Memory when content is one cohesive fact or note that remains understandable independently.
 
-resolver_vocabulary
-- subject
-- phrase
-- normalized_phrase
-- canonical_value
-- source
-- priority
+Use Collection when content contains ordered or separately maintained sections sharing a title, subject, source, or lifecycle.
 
-projection_state
-- memory_id
-- core_version
-- projected_version
-- projection_status
-- last_error
-- updated_at
+Content length is a safety constraint, not the primary semantic decision.
 
-resolver_fts
-- FTS5 search projection
+Core may:
 
-schema_meta
-- independent resolver schema version
-```
+- Validate the selected structure.
+- Recommend a Collection.
+- Detect headings and safe boundaries for preview.
+- Reject oversized standalone content.
+- Report structural inconsistencies.
 
-Resolver records are not authoritative facts.
+Core must not silently:
+
+- Split content.
+- Merge Memories.
+- Summarize or reinterpret facts.
+- Convert Memory to Collection.
+- Convert Collection to Memory.
+
+AI may propose a Collection plan, but the original content, boundaries, titles, order, and resulting sections must remain reviewable. Activation requires explicit approval.
 
 ---
 
-## 12. Core API V1
+## 12. Collection Lifecycle and Independent Editing
 
-Initial Core routes should use a clear versioned prefix, for example:
+A new Collection starts as `draft`.
+
+Resolver may project only active Collections and active Memories.
+
+Each Memory inside a Collection has its own:
+
+- Memory ID.
+- Version.
+- Lifecycle.
+- Content.
+- Structured value.
+- Source metadata.
+- Audit history.
+- Edit operation.
+
+Editing one Collection Memory must not rewrite the complete Collection.
+
+A Memory content change increments that Memory version.
+
+A structural or assembled-view change increments Collection version.
+
+Structural changes include:
+
+- Adding or removing a Memory.
+- Forgetting a Memory.
+- Moving a Memory.
+- Reordering sections.
+- Changing Collection title or summary.
+- Changing Collection lifecycle status.
+
+`collection_id` plus `sequence_number` is the canonical section order.
+
+Unchanged Memories retain IDs, versions, and content.
+
+---
+
+## 13. Core API V1
+
+Canonical Core routes include:
 
 ```text
 GET  /health
@@ -563,268 +518,393 @@ GET  /api/v1/capabilities
 
 POST /api/v1/core/memories
 GET  /api/v1/core/memories/{memory_id}
-POST /api/v1/core/memories/query
 PATCH /api/v1/core/memories/{memory_id}
+POST /api/v1/core/memories/query
 POST /api/v1/core/memories/{memory_id}/supersede
 POST /api/v1/core/memories/{memory_id}/forget
+
+POST /api/v1/core/collections
+GET  /api/v1/core/collections/{collection_id}
+PATCH /api/v1/core/collections/{collection_id}
+GET  /api/v1/core/collections/{collection_id}/memories
+POST /api/v1/core/collections/{collection_id}/memories
+PUT  /api/v1/core/collections/{collection_id}/order
+POST /api/v1/core/collections/{collection_id}/activate
+GET  /api/v1/core/collections/{collection_id}/validate
 ```
 
-Exact paths must be documented and generated from implementation.
+Exact paths and schemas are generated from current implementation.
 
-Core query is metadata-based, not semantic search. It may filter by:
+Core query is deterministic metadata filtering, not semantic search.
 
-```text
-subject
-memory_types
-scopes
-statuses
-source
-tags
-created or updated range
-limit
-```
-
-Every route defines authentication, authorization, schema, limits, stable errors, side effects, idempotency, and timeout behavior.
+Every mutation defines authentication, validation, limits, stable errors, expected-version behavior, idempotency where applicable, and audit behavior.
 
 ---
 
-## 13. Resolver API V1
+## 14. Content Limits
 
-After Core freeze, Resolver routes may include:
+Use typed and configurable limits.
+
+Initial defaults:
 
 ```text
-GET  /api/v1/resolver/capabilities
-POST /api/v1/resolver/search
-POST /api/v1/resolver/context
-POST /api/v1/resolver/vocabulary/resolve
-GET  /api/v1/resolver/projections/{memory_id}
-POST /api/v1/resolver/admin/rebuild
-GET  /api/v1/resolver/admin/rebuild/status
+raw_content: 16,384 Unicode characters
+raw_content: 65,536 UTF-8 bytes
+Collection title: 500 characters
+Collection summary: 8,192 characters
+Memory title: 500 characters
+Alias: 200 characters
+Tag: 80 characters
+Aliases per Memory: 20
+Tags per Memory: 30
 ```
 
-Rules:
+Do not silently truncate.
 
-- Search is bounded.
-- Results identify match reasons and projection freshness.
-- Admin rebuild requires separate authorization.
-- Resolver never claims stale data is current.
-- Search obtains authoritative fact data from Core before responding.
+Oversized content is rejected with a stable validation error.
 
 ---
 
-## 14. Resolver Rebuild Standard
+## 15. Resolver Contract
 
-Full rebuild must preserve Core and avoid serving a half-built index.
+Resolver must search both:
 
-Preferred flow:
+- Collection-level projections.
+- Memory-level projections.
+
+Default target:
 
 ```text
-1. Create samjon_resolver.next.sqlite.
-2. Initialize the target Resolver schema.
-3. Read active Core facts in bounded pages.
-4. Build projections, aliases, tags, vocabulary, and FTS5.
-5. Validate counts, foreign references, schema, and integrity.
-6. Stop new Resolver readers or switch them to maintenance mode.
-7. Close the current Resolver connection.
-8. Atomically replace the Resolver database.
-9. Reopen and verify readiness.
-10. Retain the prior Resolver temporarily for rollback.
+auto
 ```
 
-Do not empty the active Resolver in place while normal search traffic continues.
+Resolver result types:
 
-Selective rebuild may update one memory when Core version changes.
+```text
+standalone_memory
+collection_memory
+collection
+collection_with_selected_memories
+ambiguous
+no_match
+```
+
+Resolver must not split, merge, reorder, summarize as replacement, or rewrite Core records.
+
+A Collection result is bounded. It does not automatically include every Memory.
+
+Context expansion may include neighboring sections only when needed to preserve meaning and within the configured context budget.
 
 ---
 
-## 15. Web Portal Requirement
+## 16. Core Portal Purpose and Architecture
 
-Samjon Memory must include a human-facing Web Portal because it has no other visual interface for inspecting and verifying stored facts and resolver behavior.
+Samjon Memory includes a human-facing Core Portal for inspecting and managing authoritative facts.
 
-The Portal is a supported test and administration surface, not a direct database editor.
-
-### 15.1 Portal location
-
-Initial route:
+Route:
 
 ```text
-GET /portal/
+/portal/
 ```
 
-It may be served by the same Samjon Memory process and port `8100`.
-
-### 15.2 Portal architecture
+Canonical architecture:
 
 ```text
 Browser
--> authenticated Portal
--> documented Core and Resolver APIs
--> service/repository layers
--> separate SQLite databases
+    -> HTTP Basic authenticated server-rendered Portal
+    -> Core application-service operations
+    -> Core repositories
+    -> samjon_core.sqlite
 ```
 
-The browser and Portal routes must never open or modify SQLite directly.
+The Portal is not a direct database editor.
 
-### 15.3 Core Portal capabilities
+Portal handlers must not access:
 
-The Core section should support:
+- SQLite connections.
+- Repositories directly.
+- Arbitrary SQL.
+- Database paths.
 
-- Dashboard with Core health, schema version, counts, and last backup status.
-- List and paginate facts.
-- Filter by subject, type, scope, status, source, and date.
-- View complete fact details and audit history.
-- Create a fact through the supported Core API.
-- Edit a fact with expected-version checking.
-- Supersede a fact.
-- Forget a fact through guarded administrative flow.
-- Manage durable manual aliases, vocabulary, and user tags.
-- View idempotency outcome without exposing sensitive request content.
-- Export a bounded sanitized record for debugging.
+Static assets are limited to non-sensitive CSS, icons, and progressive-enhancement JavaScript.
 
-### 15.4 Resolver Portal capabilities
-
-The Resolver section should support:
-
-- Resolver health, schema version, projection counts, and freshness summary.
-- Search using the same Resolver API used by clients.
-- Show score, match reasons, aliases, tags, and conflicts.
-- Compare Resolver projection with the current Core fact/version.
-- List stale, failed, and missing projections.
-- Rebuild one memory.
-- Preview full rebuild impact.
-- Start a guarded full rebuild.
-- View rebuild progress and validation result.
-- Inspect derived aliases, tags, vocabulary, and FTS document.
-- Delete and recreate Resolver only through guarded rebuild operations.
-
-### 15.5 Portal safety
-
-- Portal requires authentication.
-- Administrative actions require an admin role.
-- Mutating requests require CSRF protection or an equivalent same-origin defense.
-- Destructive operations require an explicit confirmation phrase.
-- Full Core raw dumps are prohibited.
-- Sensitive fields are redacted.
-- Portal logs do not include full fact content by default.
-- Resolver deletion must never target the Core path.
-- Portal response sizes and pagination are bounded.
-- Production deployment should bind to trusted LAN or authenticated reverse proxy.
-
-### 15.6 Portal test requirements
-
-Tests must cover:
-
-- Authentication and authorization.
-- CSRF or equivalent mutation protection.
-- Core list, detail, create, update, supersede, and guarded forget.
-- Optimistic version conflict.
-- Resolver search and evidence display.
-- Stale projection warning.
-- Single-memory rebuild.
-- Full rebuild preview and confirmation.
-- Resolver rebuild does not modify Core.
-- XSS-safe rendering of untrusted content.
-- Pagination and result limits.
-- Error and degraded-state rendering.
+Do not maintain a second SPA with separate authentication, token storage, payload logic, or duplicate CRUD forms.
 
 ---
 
-## 16. Write and Idempotency Rules
+## 17. Core Portal Authentication Baseline
+
+### 17.1 Exactly one configured Portal user
+
+Core Portal V1 supports exactly one configured household administrator account.
+
+Configuration:
+
+```text
+SAMJON_PORTAL_USERNAME
+SAMJON_PORTAL_PASSWORD
+SAMJON_PORTAL_ALLOWED_ORIGINS
+```
+
+There is:
+
+- No users table.
+- No user registration.
+- No user-management UI.
+- No multiple Portal accounts.
+- No read-only Portal role.
+- No password storage in SQLite.
+
+Changing the Portal account requires changing trusted configuration and restarting the service.
+
+### 17.2 Approved authentication model
+
+Core Portal V1 uses FastAPI HTTP Basic Authentication.
+
+All Portal application routes require valid HTTP Basic credentials:
+
+```text
+/portal/
+/portal/memories
+/portal/memories/*
+/portal/collections
+/portal/collections/*
+/portal/audit
+```
+
+Missing or invalid credentials return:
+
+```text
+401 Unauthorized
+WWW-Authenticate: Basic
+```
+
+Use constant-time credential comparison where practical.
+
+### 17.3 Credential handling
+
+Portal credentials must:
+
+- Come from trusted configuration.
+- Have no production default.
+- Use synthetic values in tests.
+- Never appear in HTML.
+- Never appear in JavaScript.
+- Never appear in URLs.
+- Never appear in logs.
+- Never appear in audit records.
+- Never appear in capability responses.
+- Never be committed to source control.
+
+REST API service/admin tokens remain separate from Portal credentials.
+
+### 17.4 Explicitly deferred features
+
+Core Portal V1 must not implement:
+
+- Custom login page.
+- Signed Portal sessions.
+- Portal session cookies.
+- Server-side session storage.
+- Login nonce.
+- Logout tracking.
+- Custom HMAC session tokens.
+- Multiple Portal users or roles.
+- OAuth, OpenID Connect, or external identity providers.
+
+These require a separate approved security revision.
+
+### 17.5 Static assets
+
+`/portal/static/*` may remain public only when assets contain no credentials, tokens, Memory content, user data, private configuration, or database information.
+
+### 17.6 Mutation Origin validation
+
+Every Portal mutation must:
+
+- Require valid HTTP Basic credentials.
+- Validate Origin against `SAMJON_PORTAL_ALLOWED_ORIGINS`.
+- Preserve expected-version validation.
+- Preserve Core validation and lifecycle rules.
+- Preserve audit behavior.
+
+Development origins may include only exact configured values such as:
+
+```text
+http://localhost:8100
+http://127.0.0.1:8100
+```
+
+Origin comparison includes exact scheme, host, and port.
+
+Do not allow all HTTPS origins.
+
+Custom session-based CSRF tokens are not required because Core Portal V1 does not use cookie-session authentication. Exact Origin validation and explicit HTTP Basic authentication are the approved baseline mutation protections.
+
+### 17.7 Deployment limits
+
+Plain HTTP Basic is approved only for:
+
+- Localhost development.
+- An explicitly trusted household LAN.
+
+Default local bind:
+
+```text
+127.0.0.1
+```
+
+Binding to `0.0.0.0` requires explicit operator action.
+
+Direct public internet exposure and router port forwarding are prohibited.
+
+Broader exposure requires HTTPS, an authenticated reverse proxy, trusted-host validation, and reviewed deployment configuration.
+
+---
+
+## 18. Core Portal Capabilities
+
+The Core Portal should support:
+
+- Core health, readiness, schema version, and capability display.
+- Memory list, detail, pagination, and filters.
+- Standalone Memory creation and editing.
+- Guarded supersede and forget.
+- Collection creation as draft.
+- Collection metadata editing.
+- Adding independently managed Collection Memories.
+- Editing one Collection Memory without rewriting the Collection.
+- Section ordering.
+- Assembled Collection preview.
+- Collection validation and explicit activation.
+- Audit history.
+- Clear validation and version-conflict feedback.
+
+Resolver UI is not implemented before Resolver V1.
+
+---
+
+## 19. Portal Cancel Behavior
+
+The canonical Portal is server-rendered.
+
+Cancel controls must be navigation links or non-submit buttons.
+
+Approved navigation:
+
+```text
+Create Memory Cancel -> /portal/memories
+Create Collection Cancel -> /portal/collections
+Edit Memory Cancel -> Memory detail
+Edit Collection Cancel -> Collection detail
+```
+
+Cancel must:
+
+- Send no mutation.
+- Create no record.
+- Create no audit event.
+- Increment no version.
+- Preserve existing content.
+- Preserve Collection ordering.
+
+Obsolete SPA dialogs and duplicate form implementations must be removed.
+
+If an approved dialog remains, Cancel uses `type="button"`, resets transient state, clears transient errors, closes the dialog, restores focus, and supports Escape safely.
+
+---
+
+## 20. Portal Capability Reporting
+
+The capability endpoint describes actual proven behavior.
+
+Expected Portal shape after tests pass:
+
+```json
+{
+  "portal": {
+    "implemented": true,
+    "architecture": "server_rendered",
+    "authentication": "http_basic",
+    "users_supported": 1,
+    "roles": ["admin"],
+    "session_cookie": false,
+    "custom_login_page": false,
+    "origin_validation": true,
+    "local_network_only": true,
+    "public_internet_approved": false,
+    "status": "core_v1_local_admin"
+  }
+}
+```
+
+Do not expose username, password, hashes, or secret configuration.
+
+Only tested behavior may be reported as implemented.
+
+---
+
+## 21. Write, Version, and Idempotency Rules
 
 Memory creation is a side effect.
 
-- Accept an idempotency key.
-- Duplicate key with the same request hash returns the original result.
-- Duplicate key with a different request hash returns conflict.
+- Accept an idempotency key where defined.
+- Same key and same request returns the original result.
+- Same key with different content returns `IDEMPOTENCY_CONFLICT`.
 - Do not create duplicates after transport retries.
-- Bound content and structured-value sizes.
+- Bound content and structured values.
 - Reject prohibited sensitive data.
-- Do not silently merge conflicting facts.
+- Do not silently merge conflicts.
 
-Updates require optimistic concurrency or equivalent expected-version checks.
+Updates require optimistic concurrency using `expected_version` or an approved equivalent.
 
 Forget operations require explicit identity, authorization, and confirmation.
 
 ---
 
-## 17. Projection Freshness Rules
+## 22. Backup and Restore
 
-Each projection records the Core version used to build it.
-
-```text
-Core version == projected core version
--> current
-
-Core version > projected core version
--> stale
-
-Core fact missing or forgotten
--> remove or invalidate derived projection according to policy
-```
-
-Resolver APIs and Portal must surface stale state rather than hide it.
-
----
-
-## 18. Backup and Restore Rules
-
-### 18.1 Core
-
-`samjon_core.sqlite` is backup-critical.
+### 22.1 Core
 
 Core backup must:
 
 - Use a SQLite-safe method.
-- Include schema version and application version in a manifest.
-- Include checksum and integrity result.
-- Follow documented retention.
+- Record schema and application version.
+- Record checksum and integrity result.
+- Follow retention policy.
 - Protect backups as sensitive user data.
-- Be restored and verified in an isolated test.
+- Be restored and verified in isolation.
 
-### 18.2 Resolver
+### 22.2 Resolver
 
-`samjon_resolver.sqlite` is rebuildable and normally does not require data backup.
+Resolver data is normally rebuilt rather than restored.
 
-Back up or version:
+Version and preserve:
 
 - Resolver schema.
-- Projection algorithm version.
-- Deterministic normalization configuration.
-- AI prompt/model configuration when later approved.
+- Projection algorithm.
+- Normalization configuration.
+- Future approved AI model or prompt configuration.
 
-Manual durable information must not exist only in Resolver.
-
-### 18.3 Restore behavior
-
-After Core restore:
-
-```text
-Verify Core integrity
--> start Core
--> rebuild Resolver from restored Core
--> verify projection counts and search
-```
-
-Do not restore an old Resolver as authoritative truth.
+Manual durable information must not live only in Resolver.
 
 ---
 
-## 19. Security and Privacy Rules
+## 23. Security and Privacy
 
-- Deny unauthenticated API and Portal access.
-- Use separate service and human-admin credentials.
-- Store secrets in mounted files or approved secret injection.
-- Enforce subject-level access.
-- Redact content in logs and metrics.
+- Deny unauthenticated REST API and Portal access.
+- Keep REST API tokens separate from Portal HTTP Basic credentials.
+- Enforce subject-level API access where applicable.
+- Redact content and credentials in logs and metrics.
 - Reject prohibited credentials and sensitive information.
-- Treat stored content and derived projections as untrusted when returned to an LLM.
-- Never execute instructions contained in memories.
-- Apply the same protection to Core backups as the live Core database.
-- Resolver rebuild logs contain IDs and safe counts, not full facts.
+- Treat stored content and Resolver projections as untrusted input.
+- Never execute instructions contained in Memory.
+- Protect Core backups like the live Core database.
+- Record safe audit metadata only.
 
 ---
 
-## 20. Stable Error Rules
+## 24. Stable Errors
 
 Use stable public errors such as:
 
@@ -851,9 +931,9 @@ Do not expose SQL, filesystem paths, credentials, or stack traces.
 
 ---
 
-## 21. Observability Rules
+## 25. Observability and Audit
 
-Structured logs may include:
+Structured logs may include safe operational metadata:
 
 ```text
 timestamp
@@ -861,7 +941,6 @@ level
 service
 layer
 request_id
-client_profile
 operation
 result_code
 duration_ms
@@ -870,22 +949,23 @@ core_schema_version
 resolver_schema_version
 ```
 
-Do not log full facts, queries, structured values, credentials, database files, or raw Portal form bodies by default.
+Do not log full facts, structured values, credentials, database files, or raw Portal forms by default.
 
 Audit:
 
-- Core create/update/supersede/forget.
-- Manual alias/vocabulary/tag changes.
+- Core create, update, supersede, and forget.
+- Collection create, edit, reorder, validate, and activate.
+- Durable manual metadata changes.
 - Permission denial.
 - Sensitive-data rejection.
-- Resolver rebuild preview/start/complete/fail.
-- Portal administrative actions.
+- Resolver rebuild activities after Resolver V1 exists.
+- Portal administrative mutations.
+
+Cancel must not create an audit record.
 
 ---
 
-## 22. Configuration Rules
-
-Use typed configuration.
+## 26. Typed Configuration
 
 Expected families:
 
@@ -899,266 +979,245 @@ SAMJON_PORTAL_*
 SAMJON_REBUILD_*
 ```
 
-No default contains production tokens, personal data, or private network addresses.
-
-Portal enablement, host binding, admin role, confirmation phrase, and session security are explicit configuration.
-
----
-
-## 23. Documentation Structure
-
-Canonical documentation should separate Core and Resolver:
+Core Portal V1 configuration:
 
 ```text
-docs/
-├── DOCUMENT_INDEX.md
-├── current/
-│   ├── architecture.md
-│   ├── capabilities.md
-│   ├── data-ownership.md
-│   └── web-portal.md
-├── core/
-│   ├── data-model.md
-│   ├── memory-lifecycle.md
-│   ├── api-contract.md
-│   ├── migration-policy.md
-│   └── backup-restore.md
-├── resolver/
-│   ├── projection-model.md
-│   ├── retrieval.md
-│   ├── vocabulary.md
-│   ├── rebuild.md
-│   └── api-contract.md
-├── api/
-│   ├── openapi.json
-│   └── error-contract.md
-├── security/
-│   ├── privacy-policy.md
-│   └── portal-security.md
-├── operations/
-│   ├── deployment.md
-│   ├── core-backup-restore.md
-│   ├── resolver-rebuild.md
-│   └── troubleshooting.md
-├── integration/
-│   └── samjon-home-mcp.md
-├── adr/
-└── archive/
+SAMJON_PORTAL_USERNAME
+SAMJON_PORTAL_PASSWORD
+SAMJON_PORTAL_ALLOWED_ORIGINS
 ```
+
+No secret has an unsafe production default.
+
+Session-security configuration is deferred because Core Portal V1 does not use session authentication.
 
 ---
 
-## 24. Documentation Sync Rule
+## 27. Required Tests
 
-After every externally visible behavior change, review affected canonical documentation.
+### 27.1 Core tests
 
-Update documentation when Core or Resolver API, schema, capability, configuration, migration, projection, retrieval, error, Portal, security, backup, rebuild, or integration behavior changes.
-
-Internal refactoring with unchanged observable behavior does not require a documentation update.
-
-Before completion, report one of:
-
-```text
-Documentation updated: <files>
-Documentation unchanged: no externally visible behavior changed
-Documentation update blocked: <reason>
-```
-
-Do not create a new Markdown report for every task. Store validation evidence under `artifacts/reports/`.
-
----
-
-## 25. Testing Requirements
-
-### Core tests
-
-- Core initial migration.
-- Migration idempotency.
-- Create with idempotency.
-- Idempotency conflict.
-- Get by ID.
-- Metadata query and bounds.
-- Update with expected version.
-- Supersession.
-- Guarded forget.
+- Initial migration and migration idempotency.
+- Core schema version.
+- Standalone Memory create, read, query, update, supersede, and forget.
+- Idempotency replay and conflict.
+- Content character and UTF-8 byte limits.
+- Collection create, edit, order, validate, and activate.
+- Independent Collection Memory editing.
+- Expected-version conflict.
 - Subject isolation.
 - Sensitive-data rejection.
 - Audit behavior.
 - Core backup and isolated restore.
-- Core OpenAPI drift.
+- OpenAPI drift.
 
-### Resolver tests
+### 27.2 Portal tests
 
-- Resolver initial migration.
-- Projection from frozen Core API.
-- FTS5 search.
-- Aliases, tags, and vocabulary.
-- Score and match reasons.
-- Stale projection detection.
-- Selective rebuild.
-- Atomic full rebuild.
-- Failed rebuild rollback.
-- Resolver deletion/recreation leaves Core unchanged.
-- Bounded search and context.
-- Resolver OpenAPI drift.
+- Missing credentials return `401`.
+- `WWW-Authenticate: Basic` is present.
+- Invalid username is rejected.
+- Invalid password is rejected.
+- Valid credentials allow Portal access.
+- Memory, Collection, and audit routes require credentials.
+- Mutation without credentials is rejected.
+- Unapproved Origin is rejected.
+- Approved Origin succeeds.
+- Credentials are absent from HTML, JavaScript, URLs, logs, audit, and capabilities.
+- Memory and Collection Portal workflows pass.
+- Independent Collection Memory editing passes.
+- Cancel creates no Memory, Collection, mutation, version increment, or audit event.
+- XSS-safe rendering passes.
+- Pagination and response limits pass.
+- Static assets contain no sensitive configuration.
 
-### Portal tests
+### 27.3 Resolver tests
 
-Follow Section 15.6.
+Resolver tests begin only in Phase 2 and include migrations, projection, FTS5, aliases, vocabulary, ranking, freshness, selective rebuild, atomic rebuild, rollback, bounded context, and Core preservation.
 
-Normal tests use temporary Core and Resolver databases and never production data.
+All normal tests use temporary databases and synthetic credentials.
 
 ---
 
-## 26. Editing Policy
+## 28. Editing and Tool Policy
 
-- Prefer minimal controlled patches.
-- Do not refactor unrelated files.
-- Keep Core and Resolver SQL in their respective repositories/database layers.
-- Keep API routes thin.
-- Do not place FTS5 or derived search columns in Core merely for convenience.
-- Do not add LLM dependency to Core.
-- Do not let Portal bypass API/service policy.
-- Do not weaken privacy or confirmation policy to make a test pass.
-- Preserve backward compatibility after Core or Resolver freeze unless a new version is approved.
+- Prefer small, controlled patches.
+- Use Cline native file editing tools for source changes.
+- Do not use `python -c` to generate multiline patch scripts.
+- Do not create `patch.py`, `fix_*.py`, or generator scripts for ordinary edits.
+- Do not repeat identical failed shell-edit commands.
+- Do not use `git reset --hard` to recover from an interrupted task.
+- Inspect `git status` and `git diff` before resuming interrupted work.
+- Preserve unrelated valid changes.
+- Keep Core and Resolver SQL separate.
+- Keep API and Portal handlers thin.
+- Do not place Resolver search data in Core.
+- Do not add LLM dependencies to Core.
+- Do not let Portal bypass Core service policy.
 - Add regression tests for bug fixes.
 
-Final reports include problem, root cause, files changed, Core/Resolver impact, API impact, migration impact, Portal impact, security impact, exact tests, results, and limitations.
-
 ---
 
-## 27. Task Scope Rules for Cline
+## 29. Task Scope for Cline
+
+The currently open repository is the complete working scope.
+
+Use relative paths only.
+
+Do not inspect parent directories or sibling repositories during
+repository-local implementation tasks.
 
 Default editable scope:
 
-```text
-HomeAI/samjon-memory/
-```
+- `src/`
+- `tests/`
+- `docs/`
+- repository configuration files required by the task
 
-Read-only unless explicitly authorized:
-
-```text
-HomeAI/samjon-home-mcp/
-HomeAI/numchoke/
-HomeAI/numchai/
-HomeAI/numsub/
-HomeAI/home-ai-contracts/
-HomeAI/home-ai-deploy/
-HomeAI/docs/
-```
-
-Do not modify an MCP consumer to hide a Samjon Memory defect.
-
-Before editing, state:
-
-- Development phase: Core or Resolver.
-- Files and tests to read.
-- Files to change.
-- Core and Resolver database impact.
-- API impact.
-- Portal impact.
-- Security/privacy impact.
-- Backup/rebuild impact.
-- Test plan.
-
-Resolver implementation must not begin before the Core Freeze Gate is evidenced, unless the task is explicitly limited to non-operational scaffolding.
+Cross-project integration requires a separate task and workspace.
 
 ---
 
-## 28. Initial Development Sequence
+## 30. Documentation Structure and Sync
+
+Canonical documents include:
 
 ```text
-Phase 1: Core
-1. Scaffold service, configuration, tests, and canonical docs.
-2. Define Core memory model and explicit migrations.
-3. Implement Core database lifecycle.
-4. Implement authentication, authorization, and sensitive-data policy.
-5. Implement create/get/metadata-query APIs.
-6. Implement idempotency, versioning, supersession, and guarded forget.
-7. Implement Core audit.
-8. Implement Core Web Portal through supported APIs.
-9. Implement Core backup and isolated restore validation.
-10. Export and review Core OpenAPI.
-11. Run the Core Freeze Gate.
-12. Mark Core V1 frozen with evidence.
-
-Phase 2: Resolver
-13. Define Resolver projection schema and migrations.
-14. Implement projection from frozen Core API/service boundary.
-15. Implement FTS5, aliases, tags, vocabulary, ranking, and evidence.
-16. Implement freshness and selective rebuild.
-17. Implement atomic full rebuild and rollback.
-18. Implement Resolver Web Portal through supported APIs.
-19. Export and review Resolver OpenAPI.
-20. Run Resolver tests using representative Core facts.
-21. Freeze Resolver V1.
-
-Phase 3: MCP readiness
-22. Finalize Samjon Memory capability and integration documents.
-23. Produce final API evidence for Samjon Home MCP.
-24. Build the MCP module in the Samjon Home MCP repository.
+docs/DOCUMENT_INDEX.md
+docs/SAMJON_MEMORY_STATUS.md
+docs/current/architecture.md
+docs/current/capabilities.md
+docs/current/data-ownership.md
+docs/current/web-portal.md
+docs/core/data-model.md
+docs/core/memory-lifecycle.md
+docs/core/api-contract.md
+docs/core/migration-policy.md
+docs/core/backup-restore.md
+docs/api/openapi.json
+docs/api/error-contract.md
+docs/security/privacy-policy.md
+docs/security/portal-security.md
+docs/operations/deployment.md
+docs/operations/core-backup-restore.md
+docs/operations/troubleshooting.md
+docs/integration/home-assistant-smoke-test.md
 ```
+
+After externally visible behavior changes, update affected canonical documentation.
+
+Detailed project status:
+
+`docs/SAMJON_MEMORY_STATUS.md`
+
+Do not inspect or update umbrella status documents during repository-local
+tasks.
+
+Do not create a project-local `PROJECT_STATUS.md` under the repository root or docs directory.
+
+Historical test evidence belongs under `artifacts/reports/`.
 
 ---
 
-## 29. Release Blocking Conditions
+## 31. Release Blocking Conditions
 
 Block Core release when:
 
-- External services or Portal access Core SQLite directly.
+- External systems or Portal access Core SQLite directly.
 - Conversation history is stored automatically.
-- Sensitive credentials can be stored.
+- Sensitive credentials can be stored as Memory.
 - Writes are non-idempotent under retries.
 - Core migrations lack tests.
-- Subject authorization is missing.
-- Core backup/restore is untested.
-- Core Portal bypasses service/API validation.
+- Core backup and restore are untested.
 - Core API/OpenAPI drift exists.
+- Portal application routes lack HTTP Basic authentication.
+- Portal credentials are hard-coded or exposed.
+- Portal mutations accept unapproved Origins.
+- Cancel performs a mutation or creates audit.
+- Duplicate SPA and server-rendered editing paths remain active.
+- Capabilities claim session, role, CSRF, authentication, or CRUD behavior that is not implemented.
 
 Block Resolver release when:
 
-- Resolver can modify Core facts.
-- Manual durable data exists only in Resolver.
+- Resolver modifies Core facts.
+- Durable manual information exists only in Resolver.
 - Resolver cannot be deleted and rebuilt.
-- Rebuild exposes a half-built active index.
+- Rebuild exposes a half-built index.
 - Projection freshness is hidden.
 - Retrieval is unbounded or unexplained.
 - Resolver migrations or rebuild tests fail.
-- Resolver Portal can target the Core database path.
-- Resolver API/OpenAPI drift exists.
 
-Block all releases when:
-
-- Secrets or full fact content appear in logs by default.
-- Embeddings or LLM calls are added without ADR.
-- Documentation claims more than tests prove.
+Block all releases when secrets or full fact content appear in logs by default, or documentation claims more than tests prove.
 
 ---
 
-## 30. Definition of Done
+## 32. Definition of Done
 
-### Core V1
+### 32.1 Core V1
 
-- Core schema and API are versioned and frozen.
-- Create, get, metadata query, update, supersede, and guarded forget are tested.
-- Idempotency and authorization are tested.
-- Core Portal supports safe inspection and editing through APIs.
+Core V1 is done when:
+
+- Schema and API are versioned.
+- Memory and Collection lifecycle operations are tested.
+- Independent Collection Memory editing is tested.
+- Idempotency, authorization, limits, and audit are tested.
+- Core Portal supports safe inspection and editing.
+- Portal is protected by HTTP Basic Authentication.
+- Portal mutations validate exact Origin.
+- Credentials are absent from rendered and logged content.
+- Cancel has no mutation or audit side effects.
 - Backup and isolated restore pass.
-- OpenAPI and canonical docs match implementation.
+- OpenAPI and canonical documentation match implementation.
+- Owner approval records the freeze.
 
-### Resolver V1
+### 32.2 Resolver V1
+
+Resolver V1 is done when:
 
 - Resolver database is physically separate and rebuildable.
 - Projection uses frozen Core data.
+- Collection-level and Memory-level search work from one intent.
 - FTS5, vocabulary, aliases, tags, ranking, and freshness are tested.
 - Atomic rebuild and rollback pass.
-- Resolver Portal exposes search evidence and guarded rebuild controls.
-- Resolver deletion/recreation leaves Core unchanged.
-- OpenAPI and canonical docs match implementation.
+- Resolver Portal exposes evidence and guarded rebuild operations.
+- Resolver recreation leaves Core unchanged.
+- OpenAPI and canonical documentation match implementation.
 
 ---
 
-## 31. Final Engineering Principle
+## 33. Initial Development Sequence
+
+```text
+Phase 1: Core
+1. Define Core schema and migrations.
+2. Implement Memory and Collection lifecycle.
+3. Implement idempotency, audit, limits, and sensitive-data policy.
+4. Implement API and OpenAPI.
+5. Implement server-rendered Core Portal.
+6. Protect Portal with one-user HTTP Basic Authentication.
+7. Validate exact mutation Origins.
+8. Test Cancel as a no-side-effect action.
+9. Validate backup and isolated restore.
+10. Freeze Core with owner approval.
+
+Phase 2: Resolver
+11. Define Resolver projection schema and migrations.
+12. Project frozen Core data.
+13. Implement Collection and Memory intent search.
+14. Implement FTS5, ranking, evidence, and freshness.
+15. Implement selective and atomic full rebuild.
+16. Implement Resolver Portal.
+17. Freeze Resolver.
+
+Phase 3: MCP
+18. Finalize Samjon Memory API evidence.
+19. Build the thin Samjon module in Samjon Home MCP.
+20. Run compatibility and consumer tests.
+21. Publish approved contract.
+```
+
+---
+
+## 34. Final Engineering Principles
 
 ```text
 Core stores authoritative facts.
@@ -1166,301 +1225,39 @@ Resolver stores derived search projections.
 Core is backup-critical.
 Resolver is disposable and rebuildable.
 Manual durable knowledge belongs in Core.
-AI may enrich Resolver but may not rewrite Core facts.
-The Portal uses supported APIs and never edits SQLite directly.
+AI may enrich Resolver but may not rewrite Core.
+Creator chooses Memory or Collection.
+Collection Memories are independently editable.
+The Portal never edits SQLite directly.
+Core Portal V1 has one configured Admin user.
+Core Portal V1 uses HTTP Basic Authentication.
+Custom Portal sessions are deferred.
+Portal mutations validate exact Origin.
+Cancel has no side effects.
 Core freezes before Resolver implementation.
-REST remains the external boundary.
+REST remains the external system boundary.
 ```
 
 ---
 
-## 32. Change Log
+## 35. Change Log
+
+### 2.1.0, 2026-09-18
+
+- Replaced the incomplete custom Portal-session direction with HTTP Basic Authentication.
+- Defined exactly one configured household Portal administrator.
+- Prohibited a users table, user registration, multiple Portal accounts, and Portal role management in Core V1.
+- Deferred custom login pages, session cookies, login nonces, logout tracking, and HMAC session frameworks.
+- Required exact Origin allowlisting for Portal mutations.
+- Standardized on one canonical server-rendered Portal.
+- Defined no-side-effect Cancel behavior.
+- Added native-editing guidance to prevent repeated PowerShell and Python patch-script failures.
 
 ### 2.0.0, 2026-09-16
 
-- Split Samjon Memory into physically separate Core and Resolver SQLite databases.
-- Defined Core-first development and Core V1 freeze before Resolver implementation.
-- Defined Resolver as disposable, rebuildable, and one-way derived from Core.
-- Moved FTS5, aliases, semantic tags, vocabulary projection, and ranking to Resolver.
-- Kept durable manual metadata and authoritative facts in Core.
-- Added the authenticated Web Portal requirement for inspecting and editing Core and Resolver through supported APIs.
-- Added guarded Resolver rebuild, freshness, backup, restore, and Portal security requirements.
-
-
-## 33. Memory versus Collection Decision Rule
-
-### 33.1 Storage-type ownership
-
-The creating user or approved client explicitly chooses whether content
-is stored as:
-
-- a standalone memory, or
-- a collection containing one or more independently managed memories.
-
-Core must not infer or automatically change the selected storage type.
-
-Use a standalone memory when the content represents one cohesive fact or
-note that remains understandable independently.
-
-Use a collection when the content contains multiple ordered or separately
-maintained sections that share one title, subject, source, or lifecycle.
-
-Content length is a safety constraint, not the primary semantic decision.
-
-### 33.2 Core responsibilities
-
-Core stores facts only.
-
-Core may:
-
-- validate the selected structure
-- recommend using a collection
-- detect headings and safe section boundaries for preview
-- reject content exceeding the standalone-memory hard limit
-- report structural inconsistencies
-- preserve the original submitted content for review
-
-Core must not silently:
-
-- split content
-- merge memories
-- summarize content
-- reinterpret facts
-- change a standalone memory into a collection
-- change a collection into a standalone memory
-
-An AI-assisted workflow may propose a collection plan, including:
-
-- collection title
-- collection summary
-- section titles
-- proposed section boundaries
-- proposed ordering
-
-The original content, proposed boundaries, titles, ordering, and resulting
-memory sections must remain reviewable.
-
-No AI-proposed structure may be activated without explicit approval from
-the creating user or an authorized approving client.
-
-### 33.3 Collection lifecycle
-
-A new collection is created with `draft` status.
-
-A draft collection is not visible to Resolver.
-
-The collection becomes `active` only after:
-
-- its structure passes validation
-- all required memory sections are present
-- section ordering is valid
-- the creating user or approved client explicitly activates it
-
-Only active collections and active memories are eligible for Resolver
-projection.
-
-### 33.4 Collection-memory independence
-
-Each memory inside a collection has its own:
-
-- memory ID
-- version
-- lifecycle status
-- content
-- structured value
-- source metadata
-- audit history
-- edit endpoint
-
-Editing one memory inside a collection must not require replacing or
-rewriting the complete collection.
-
-A memory-content change increments that memory's version.
-
-A change affecting the assembled collection view also increments the
-collection version.
-
-Structural collection changes include:
-
-- adding a memory
-- removing or forgetting a memory
-- moving a memory
-- changing section order
-- changing collection title or summary
-- changing collection lifecycle status
-
-Unchanged memories retain their existing IDs, versions, and content.
-
-### 33.5 Resolver boundaries
-
-Resolver must not:
-
-- split Core memories
-- merge Core memories
-- rewrite Core facts
-- summarize Core facts as replacements
-- change collection membership
-- change section ordering
-- write directly to the Core database
-
-Resolver builds derived projections only.
-
-Resolver must search both:
-
-- collection-level projections
-- memory-level projections
-
-from one search intent.
-
-The default Resolver target is:
-
-`auto`
-
-An authorized client may explicitly request:
-
-- `memory`
-- `collection`
-- `auto`
-
-### 33.6 Resolver result types
-
-Resolver may return one of these resolution types:
-
-- `standalone_memory`
-- `collection_memory`
-- `collection`
-- `collection_with_selected_memories`
-- `ambiguous`
-- `no_match`
-
-Definitions:
-
-`standalone_memory`
-means one independent memory matched the intent.
-
-`collection_memory`
-means one memory inside a collection matched the intent.
-
-`collection`
-means the collection title, summary, or overall purpose matched the
-intent.
-
-`collection_with_selected_memories`
-means multiple relevant memories from the same collection matched the
-intent.
-
-`ambiguous`
-means the available evidence is insufficient to choose safely.
-
-`no_match`
-means no result met the configured threshold.
-
-Resolver must not guess when the result is ambiguous.
-
-### 33.7 Collection result limits
-
-A collection result does not automatically include every memory in the
-collection.
-
-Resolver must apply a bounded context budget.
-
-When the complete collection exceeds the applicable limit, Resolver
-returns:
-
-- collection identity
-- collection title
-- collection summary
-- collection version
-- section index
-- the memories most relevant to the intent
-- continuation or retrieval metadata when supported
-
-Resolver may return the complete collection only when:
-
-- the client requests collection-level context
-- authorization permits access to every included memory
-- the collection fits within the configured result limit
-- the assembled result remains within the response budget
-
-Resolver must never produce an unbounded Core data dump.
-
-### 33.8 Context expansion
-
-When a memory inside a collection matches, Resolver may include neighboring
-memories when they are necessary to preserve meaning.
-
-Examples include:
-
-- a preceding definition
-- a following exception
-- a prerequisite section
-- a directly related step
-- an immediately adjacent section required for continuity
-
-Context expansion must:
-
-- remain inside the same authorized collection
-- respect sequence order
-- remain within the configured context budget
-- identify primary and supporting memories separately
-- provide reasons for including supporting memories
-
-Neighboring memories must not be included automatically when the primary
-memory is independently understandable.
-
-### 33.9 Authoritative result loading
-
-Resolver returns matched identities, scores, match reasons, conflicts,
-and projection metadata.
-
-Before returning fact content, the service loads the authoritative
-records from Core.
-
-Resolver projection content must not replace the current Core fact.
-
-Every resolved result must identify:
-
-- memory ID or collection ID
-- Core version
-- projected Core version
-- projection freshness
-- score
-- match reasons
-- result type
-
-If the Resolver projection is stale, the response must report that state
-according to the approved freshness policy.
-
-### 33.10 Canonical summary
-
-```text
-Creator chooses Memory or Collection.
-
-Core validates but never infers storage structure.
-
-Core stores facts only.
-
-Each memory inside a Collection has its own identity, version, lifecycle,
-audit history, and edit endpoint.
-
-Editing one Collection memory does not require rewriting the whole
-Collection.
-
-Structural or assembled-view changes increment the Collection version.
-
-AI may propose structure but cannot activate it without approval.
-
-Resolver cannot split, merge, summarize as replacement, or rewrite Core
-records.
-
-Resolver searches Collection-level and Memory-level projections from one
-intent.
-
-Resolver target defaults to auto.
-
-Resolver may return a standalone memory, one memory in a collection,
-a bounded collection, selected memories from a collection, ambiguity,
-or no match.
-
-Resolver returns evidence and identities, then authoritative content is
-loaded from Core.
+- Split Samjon Memory into separate Core and Resolver SQLite databases.
+- Defined Core-first development and Core freeze before Resolver.
+- Added the Core and Resolver Portal requirements.
+- Added Memory versus Collection ownership and independent Collection Memory editing.
+
+EOF

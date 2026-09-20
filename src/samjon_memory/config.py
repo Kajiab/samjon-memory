@@ -13,13 +13,24 @@ class CoreConfig:
     port: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_PORT", "8100")))
     idempotency_ttl_hours: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_IDEMPOTENCY_TTL_HOURS", "24")))
     portal_enabled: bool = field(default_factory=lambda: os.environ.get("SAMJON_CORE_PORTAL_ENABLED", "true").lower() in ("true", "1", "yes"))
+    portal_allowed_origins: list[str] = field(default_factory=lambda: os.environ.get("SAMJON_PORTAL_ALLOWED_ORIGINS", "http://localhost:8100,http://127.0.0.1:8100").split(","))
     log_level: str = field(default_factory=lambda: os.environ.get("SAMJON_CORE_LOG_LEVEL", "INFO"))
     max_raw_content_chars: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_MAX_RAW_CONTENT_CHARS", "16384")))
     max_raw_content_bytes: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_MAX_RAW_CONTENT_BYTES", "65536")))
     max_query_limit: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_MAX_QUERY_LIMIT", "100")))
     cors_origins: list[str] = field(default_factory=lambda: os.environ.get("SAMJON_CORE_CORS_ORIGINS", "*").split(","))
+
+    @property
+    def portal_username(self) -> str:
+        return os.environ.get("SAMJON_PORTAL_USERNAME", "")
+
+    @property
+    def portal_password(self) -> str:
+        return os.environ.get("SAMJON_PORTAL_PASSWORD", "")
+
     @property
     def has_auth(self): return bool(self.service_token and self.admin_token and self.read_token)
+
     @property
     def is_development(self): return os.environ.get("SAMJON_CORE_ENV", "development") == "development"
 

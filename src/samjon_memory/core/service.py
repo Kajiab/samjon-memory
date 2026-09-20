@@ -124,6 +124,7 @@ class CoreService:
             raise NotFound(f"Collection not found: {collection_id}")
         for i, mid in enumerate(ordered_memory_ids):
             self.conn.execute("UPDATE memory SET sequence_number=? WHERE memory_id=? AND collection_id=?", (i + 1, mid, collection_id))
+        self.conn.execute("UPDATE memory_collection SET version=version+1, updated_at=? WHERE collection_id=?", (utc_now(), collection_id))
         self.conn.commit()
         self._audit("collection", collection_id, "collection_structure_change", actor, coll.get("source", ""), coll["version"] + 1)
         return {"reordered": True}
@@ -162,7 +163,7 @@ class CoreService:
         return {"valid": len(issues) == 0, "issues": issues, "memory_count": len(memories)}
 
     def get_collection_memories(self, collection_id, limit=20, offset=0):
-        return self.memories.list(collection_id=collection_id, limit=limit, offset=offset)
+        return self.memories.list(collection_id=collection_id, limit=limit, offset=offset, order_by="sequence_number ASC")
 
     def get_audit_records(self, entity_id=None, entity_type=None, action=None, limit=50, offset=0):
         """Retrieve audit records with optional filters."""
