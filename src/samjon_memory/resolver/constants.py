@@ -17,6 +17,35 @@ DOCUMENT_ENTITY_TYPES = {
 # Projection audit history bound (rows kept in each rebuilt Resolver DB)
 PROJECTION_AUDIT_HISTORY_LIMIT = 50
 
+# Query targets
+TARGET_AUTO = "auto"
+TARGET_MEMORY = "memory"
+TARGET_COLLECTION = "collection"
+TARGETS = {TARGET_AUTO, TARGET_MEMORY, TARGET_COLLECTION}
+
+# Query result types
+RESULT_STANDALONE = "standalone_memory"
+RESULT_COLLECTION_MEMORY = "collection_memory"
+RESULT_COLLECTION = "collection"
+RESULT_COLLECTION_WITH_SELECTED = "collection_with_selected_memories"
+RESULT_AMBIGUOUS = "ambiguous"
+RESULT_NO_MATCH = "no_match"
+
+# Query limits
+MAX_QUERY_LENGTH = 2000
+MAX_QUERY_TOKENS = 64
+DEFAULT_QUERY_LIMIT = 10
+MAX_QUERY_LIMIT = 100
+AMBIGUOUS_EPSILON = 0.001
+
+# Deterministic ranking weight constants
+BOOST_EXACT_SUBJECT = 10.0
+BOOST_TITLE = 5.0
+BOOST_SUBJECT_TERM = 3.0
+BOOST_ALIAS = 2.0
+BOOST_VOCAB = 2.0
+BOOST_TAG = 1.0
+
 # Projection audit build types
 BUILD_TYPE_FULL = "full"
 BUILD_TYPE_SELECTIVE = "selective"

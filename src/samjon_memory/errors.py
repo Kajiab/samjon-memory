@@ -51,6 +51,10 @@ class RebuildInProgress(SamjonMemoryError):
     def __init__(self, message="REBUILD_IN_PROGRESS"):
         super().__init__("REBUILD_IN_PROGRESS", message, 409)
 
+class ProjectionStale(SamjonMemoryError):
+    def __init__(self, message="PROJECTION_STALE"):
+        super().__init__("PROJECTION_STALE", message, 503)
+
 class ProjectionFailed(SamjonMemoryError):
     def __init__(self, message="PROJECTION_FAILED"):
         super().__init__("PROJECTION_FAILED", message, 500)

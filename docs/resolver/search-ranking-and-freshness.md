@@ -6,7 +6,8 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 
-> Planning document. No code is written in this task.
+> Foundation C1 (search, ranking, freshness) is implemented and tested; this
+> document records design, rules, and the remaining Foundation C2 work.
 
 ## 1. FTS5 Query Handling (Decision 10)
 

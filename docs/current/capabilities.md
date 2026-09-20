@@ -38,10 +38,14 @@ Proven capabilities for Samjon Memory Core V1.
 | Resolver atomic rebuild + rollback | PROVEN | temp DB swap, .prev rollback, interrupted-swap recovery |
 | Resolver rebuild lock | PROVEN | REBUILD_IN_PROGRESS |
 | Resolver rebuild API | PROVEN | admin-token rebuild; read-token status |
+| Resolver search API + result types | PROVEN | POST /api/v1/resolver/query (read token); standalone/collection/collection_with_selected/ambiguous/no_match |
+| Resolver deterministic ranking | PROVEN | title/exact-subject above content; alias/vocab/tag boosts; deterministic tie-break; no recency |
+| Resolver safe FTS5 query parsing | PROVEN | quotes/parens/hyphens/colons/asterisks/Thai punctuation/operators/empty/oversized |
+| Resolver freshness + allow_stale | PROVEN | fresh/stale/missing/orphaned from Core version+checksum; allow_stale |
 | OpenAPI | PROVEN | drift test |
 
 ## 3. Limitations
 
-- No FTS5 search query layer
-- No Resolver search / ranking / selective rebuild / context expansion / Resolver Portal
+- Resolver search/ranking/freshness: Implemented (Foundation C1)
+- No selective rebuild / context-neighbor expansion / Resolver Portal (Foundation C2)
 - No semantic search / embeddings / vector search / AI enrichment / MCP

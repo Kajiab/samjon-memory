@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Request
 
 from samjon_memory.core.service import CoreService
+from samjon_memory.resolver.models import ResolverQuery
 from samjon_memory.resolver.service import ResolverService
 from samjon_memory.security.auth import require_admin, require_read
 
@@ -49,3 +50,19 @@ async def resolver_rebuild_status(request: Request, _: bool = Depends(require_re
 async def resolver_projection_status(request: Request, _: bool = Depends(require_read)):
     """Return projection state and per-entity status (read-token boundary)."""
     return _svc(request).projection_status()
+
+
+@router.post("/api/v1/resolver/query", response_model=None)
+async def resolver_query(request: Request, body: ResolverQuery, _: bool = Depends(require_read)):
+    """Deterministic Resolver search (requires the existing REST read token)."""
+    return _svc(request).search(
+        _core(request),
+        body.query,
+        target=body.target,
+        collection_id=body.collection_id,
+        scope=body.scope,
+        limit=body.limit,
+        offset=body.offset,
+        allow_stale=body.allow_stale,
+        epsilon=body.epsilon,
+    )

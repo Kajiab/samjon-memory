@@ -152,6 +152,25 @@ class ResolverService:
             "entities": [dict(r) for r in rows],
         }
 
+    def search(self, core_service, query, target="auto", collection_id=None,
+               scope=None, limit=10, offset=0, allow_stale=False, epsilon=None):
+        """Deterministic search over the Resolver projection (Foundation C1)."""
+        from samjon_memory.resolver.constants import AMBIGUOUS_EPSILON
+        from samjon_memory.resolver import search as _search
+
+        return _search.search(
+            self.conn,
+            core_service,
+            query,
+            target=target,
+            collection_id=collection_id,
+            scope=scope,
+            limit=limit,
+            offset=offset,
+            allow_stale=allow_stale,
+            epsilon=AMBIGUOUS_EPSILON if epsilon is None else epsilon,
+        )
+
     def projection_audit(self, limit: int = 20) -> list:
         """Return recent projection_audit rows (foundation, read-only)."""
         rows = self.conn.execute(

@@ -20,7 +20,7 @@
 - Dashboard metrics: Implemented
 - Audit summary, filters, pagination: Implemented
 - Manual Portal verification: PASS
-- Resolver: Foundation B (schema 1.1.0, full projection build)
+- Resolver: Foundation C1 (schema 1.1.0, search/ranking/freshness)
 - MCP readiness: Not ready
 
 ## Core Baseline
@@ -72,7 +72,7 @@ Required configuration:
 
 ## Resolver
 
-- Status: Foundation B delivered (full projection build); search/ranking/selective not started
+- Status: Foundation C1 delivered (search, ranking, freshness); selective rebuild/context/Portal not implemented
 - Resolver database (samjon_resolver.sqlite): created, schema 1.1.0
 - FTS5 availability check: Implemented (fail-fast RESOLVER_DATABASE_UNAVAILABLE)
 - Resolver migrations: Implemented and idempotent
@@ -90,7 +90,15 @@ Required configuration:
 - Single-process rebuild lock (`REBUILD_IN_PROGRESS`): Implemented
 - Rebuild API: `POST /api/v1/resolver/rebuild` (admin), `GET .../rebuild/status` + `GET .../projection/status` (read token)
 - FTS5 rows match snapshot rows: PROVEN
-- Not implemented: search, ranking, freshness, selective rebuild, context expansion, Resolver Portal, AI, embeddings, MCP
+- Resolver search API: `POST /api/v1/resolver/query` (read token) Implemented, PROVEN by tests
+- Safe FTS5 query parsing (quotes/parens/hyphens/colons/asterisks/Thai punctuation/operators/empty/oversized): Implemented
+- Deterministic ranking (no recency): title + exact-subject above content; alias/vocab/tag boosts; deterministic tie-break
+- Result types: standalone_memory, collection_memory, collection, collection_with_selected_memories, ambiguous, no_match
+- Human-readable match reasons: Implemented
+- Projection freshness (fresh/stale/missing/orphaned from current Core version + checksum): Implemented
+- `allow_stale`: default false -> PROJECTION_STALE; true -> IDs + evidence with freshness=stale and incomplete=true
+- Bounded results + limit/offset pagination: Implemented
+- Not implemented: selective rebuild, context-neighbor expansion, Resolver Portal, embeddings, vector search, AI enrichment, MCP
 - Semantic search: Not implemented
 - AI enrichment: Not implemented
 - Embeddings: Not implemented
@@ -101,7 +109,7 @@ Required configuration:
 All tests pass with executable evidence:
 
 - Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 208
+- Passed: 238
 - Failed: 0
 - Skipped: 0
 - Verified: 2026-09-20
