@@ -1,10 +1,10 @@
 # Samjon Memory Document Index
 
 **Document ID:** SAMJON-MEMORY-DOC-INDEX-001
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Status:** Canonical
 **Owner:** Samjon Memory Engineering
-**Last reviewed:** 2026-09-18
+**Last reviewed:** 2026-09-20
 
 ## 1. Purpose
 
@@ -45,6 +45,10 @@ This is the documentation entry point and authority map for Samjon Memory.
 | docs/operations/troubleshooting.md | CANONICAL | Troubleshooting |
 | docs/design/forget-restore-purge.md | CANONICAL | Lifecycle spec (Forget/Restore/Purge) |
 | docs/integration/home-assistant-smoke-test.md | CANONICAL | Home Assistant smoke test |
+| docs/resolver/RESOLVER_V1_SPEC.md | PLANNED | Resolver V1 specification |
+| docs/resolver/schema-and-migrations.md | PLANNED | Resolver schema and migration plan |
+| docs/resolver/search-ranking-and-freshness.md | PLANNED | Resolver search, ranking, and freshness |
+| docs/resolver/rebuild-and-test-plan.md | PLANNED | Resolver rebuild and test plan |
 
 ## 4. Documentation Structure
 
@@ -77,6 +81,11 @@ docs/
 │   └── forget-restore-purge.md
 ├── integration/
 │   └── home-assistant-smoke-test.md
+├── resolver/
+│   ├── RESOLVER_V1_SPEC.md
+│   ├── schema-and-migrations.md
+│   ├── search-ranking-and-freshness.md
+│   └── rebuild-and-test-plan.md
 ├── adr/
 └── archive/
 ```
@@ -111,7 +120,8 @@ samjon-memory/docs/SAMJON_MEMORY_STATUS.md
 | Audit records | PROVEN | Audit tests |
 | Web Portal | PROVEN | Portal tests |
 | Backup and restore | PROVEN | Backup tests |
-| FTS5 | NOT STARTED | Deferred |
+| FTS5 | PLANNED | Resolver V1 planning; not implemented |
+| Resolver V1 | PLANNED | Planning docs only; no implementation |
 | Semantic search | NOT STARTED | Deferred |
 | AI enrichment | NOT STARTED | Deferred |
 | Embeddings/vector search | NOT STARTED | ADR required |
@@ -138,6 +148,7 @@ Update canonical documents for externally visible API, schema, retrieval, migrat
 - [x] Define API and error contracts.
 - [x] Define privacy policy.
 - [x] Define migration and backup/restore operations.
+- [ ] Create Resolver V1 planning documents (SPEC, schema/migrations, ranking/freshness, rebuild/test).
 
 ## 10. Approval Checklist
 
