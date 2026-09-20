@@ -81,8 +81,20 @@ def _q(request: Request, key: str, default: str = "") -> str:
 
 
 @router.get("/portal/", response_class=HTMLResponse)
-async def portal_index(request: Request):
-    return RedirectResponse(url="/portal/memories", status_code=303)
+async def portal_index(request: Request, _: str = Depends(portal_auth)):
+    svc = _svc(request)
+    stats = svc.dashboard_stats()
+    recent = svc.get_audit_records(limit=8, offset=0)
+    message = _q(request, "message")
+    return HTMLResponse(content=pages.dashboard(stats=stats, recent_audit=recent, message=message))
+
+
+@router.get("/portal/admin", response_class=HTMLResponse)
+async def portal_admin(request: Request, _: str = Depends(portal_auth)):
+    svc = _svc(request)
+    stats = svc.admin_stats()
+    message = _q(request, "message")
+    return HTMLResponse(content=pages.admin_page(stats=stats, message=message))
 
 
 @router.get("/portal/memories", response_class=HTMLResponse)
@@ -90,17 +102,19 @@ async def portal_memories(request: Request, _: str = Depends(portal_auth)):
     svc = _svc(request)
     subject = _q(request, "subject")
     status_filter = _q(request, "status")
+    scope = _q(request, "scope")
     offset = int(_q(request, "offset", "0"))
     memories = svc.query_memories(
         subject=subject or None,
         status=status_filter or None,
+        collection_scope=scope or None,
         limit=DEFAULT_PAGE_SIZE,
         offset=offset,
     )
     message = _q(request, "message")
     return HTMLResponse(content=pages.memory_list(
         memories=memories, subject=subject or "", status_filter=status_filter,
-        offset=offset, message=message,
+        scope=scope or "", offset=offset, message=message,
     ))
 
 
@@ -140,6 +154,56 @@ async def portal_memory_detail(request: Request, memory_id: str, _: str = Depend
         return HTMLResponse(content=pages.error_page(message=e.message), status_code=e.status_code)
     message = _q(request, "message")
     return HTMLResponse(content=pages.memory_detail(memory=memory, message=message))
+
+
+@router.post("/portal/memories/{memory_id}/activate", response_class=HTMLResponse)
+async def portal_activate_memory(memory_id: str, request: Request, _: str = Depends(portal_auth)):
+    validate_origin(request)
+    svc = _svc(request)
+    form = await request.form()
+    raw = form.get("expected_version")
+    try:
+        expected_version = int(raw) if raw not in (None, "") else None
+    except (TypeError, ValueError):
+        expected_version = None
+    try:
+        svc.activate_memory(memory_id, expected_version=expected_version, actor="portal")
+        return RedirectResponse(
+            url=f"/portal/memories/{memory_id}?message=memory_activated", status_code=303,
+        )
+    except SamjonMemoryError as e:
+        return RedirectResponse(
+            url=f"/portal/memories/{memory_id}?message=error: {e.message}", status_code=303,
+        )
+
+
+@router.post("/portal/memories/{memory_id}/restore", response_class=HTMLResponse)
+async def portal_restore_memory(memory_id: str, request: Request, _: str = Depends(portal_auth)):
+    validate_origin(request)
+    svc = _svc(request)
+    try:
+        svc.restore_memory(memory_id, actor="portal")
+        return RedirectResponse(url=f"/portal/memories/{memory_id}?message=restored", status_code=303)
+    except SamjonMemoryError as e:
+        return RedirectResponse(url=f"/portal/memories/{memory_id}?message=error: {e.message}", status_code=303)
+
+
+@router.post("/portal/memories/{memory_id}/purge", response_class=HTMLResponse)
+async def portal_purge_memory(memory_id: str, request: Request, username: str = Depends(portal_auth)):
+    validate_origin(request)
+    svc = _svc(request)
+    form = await request.form()
+    confirmation = form.get("confirmation", "") or ""
+    raw = form.get("expected_version")
+    try:
+        expected_version = int(raw) if raw not in (None, "") else None
+    except (TypeError, ValueError):
+        expected_version = None
+    try:
+        svc.purge_memory(memory_id, confirmation=confirmation, expected_version=expected_version, actor=username)
+        return RedirectResponse(url=f"/portal/memories/{memory_id}?message=purged", status_code=303)
+    except SamjonMemoryError as e:
+        return RedirectResponse(url=f"/portal/memories/{memory_id}?message=error: {e.message}", status_code=303)
 
 
 @router.get("/portal/memories/{memory_id}/edit", response_class=HTMLResponse)
@@ -221,9 +285,13 @@ async def portal_memory_forget(request: Request, memory_id: str, _: str = Depend
 @router.get("/portal/collections", response_class=HTMLResponse)
 async def portal_collections(request: Request, _: str = Depends(portal_auth)):
     svc = _svc(request)
-    collections = svc.collections.list(limit=100, offset=0)
+    status = _q(request, "status")
+    invalid = _q(request, "invalid") in ("1", "true", "True", "on")
+    collections = svc.list_collections(status=status or None, invalid=invalid, limit=100, offset=0)
     message = _q(request, "message")
-    return HTMLResponse(content=pages.collection_list(collections=collections, message=message))
+    return HTMLResponse(content=pages.collection_list(
+        collections=collections, message=message, status_filter=status, invalid=invalid,
+    ))
 
 
 @router.get("/portal/collections/create", response_class=HTMLResponse)
@@ -382,6 +450,30 @@ async def portal_reorder_collection(collection_id: str, request: Request, _: str
         return RedirectResponse(url=f"/portal/collections/{collection_id}?message=error: {e.message}", status_code=303)
 
 
+@router.post("/portal/collections/{collection_id}/restore", response_class=HTMLResponse)
+async def portal_restore_collection(collection_id: str, request: Request, _: str = Depends(portal_auth)):
+    validate_origin(request)
+    svc = _svc(request)
+    try:
+        svc.restore_collection(collection_id, actor="portal")
+        return RedirectResponse(url=f"/portal/collections/{collection_id}?message=restored", status_code=303)
+    except SamjonMemoryError as e:
+        return RedirectResponse(url=f"/portal/collections/{collection_id}?message=error: {e.message}", status_code=303)
+
+
+@router.post("/portal/collections/{collection_id}/purge", response_class=HTMLResponse)
+async def portal_purge_collection(collection_id: str, request: Request, username: str = Depends(portal_auth)):
+    validate_origin(request)
+    svc = _svc(request)
+    form = await request.form()
+    confirmation = form.get("confirmation", "") or ""
+    try:
+        svc.purge_collection(collection_id, confirmation=confirmation, actor=username)
+        return RedirectResponse(url=f"/portal/collections/{collection_id}?message=purged", status_code=303)
+    except SamjonMemoryError as e:
+        return RedirectResponse(url=f"/portal/collections/{collection_id}?message=error: {e.message}", status_code=303)
+
+
 @router.post("/portal/collections/{collection_id}/activate", response_class=HTMLResponse)
 async def portal_activate_collection(collection_id: str, request: Request, _: str = Depends(portal_auth)):
     validate_origin(request)
@@ -393,17 +485,36 @@ async def portal_activate_collection(collection_id: str, request: Request, _: st
         return RedirectResponse(url=f"/portal/collections/{collection_id}?message=error: {e.message}", status_code=303)
 
 
+def _q_int(request: Request, key: str, default: int) -> int:
+    try:
+        return int(request.query_params.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
 @router.get("/portal/audit", response_class=HTMLResponse)
 async def portal_audit(request: Request, _: str = Depends(portal_auth)):
     svc = _svc(request)
     entity_id = _q(request, "entity_id")
     entity_type = _q(request, "entity_type")
     action = _q(request, "action")
+    since = _q(request, "since")
+    until = _q(request, "until")
+    offset = _q_int(request, "offset", 0)
+    page_size = 50
     records = svc.get_audit_records(
         entity_id=entity_id or None, entity_type=entity_type or None,
-        action=action or None, limit=100, offset=0,
+        action=action or None, since=since or None, until=until or None,
+        limit=page_size, offset=offset,
+    )
+    summary = svc.audit_summary(
+        entity_type=entity_type or None, action=action or None,
+        since=since or None, until=until or None,
     )
     message = _q(request, "message")
     return HTMLResponse(content=pages.audit_log(
-        records=records, entity_id=entity_id, entity_type=entity_type, action=action, message=message,
+        records=records, entity_id=entity_id, entity_type=entity_type, action=action,
+        since=since, until=until, offset=offset, page_size=page_size,
+        count=offset + len(records) + (1 if len(records) == page_size else 0),
+        message=message, summary=summary,
     ))

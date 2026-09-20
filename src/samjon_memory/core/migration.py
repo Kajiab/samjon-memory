@@ -122,7 +122,49 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_idem_expires ON idempotency_record(expires_at);
 """
 
-_MIGRATION_SEQUENCE = [_SCHEMA_SQL, _DURABLE_SQL, _IDEMPOTENCY_SQL, _AUDIT_SQL, _INDEX_SQL]
+_V110_SQL = """
+ALTER TABLE memory ADD COLUMN forgotten_at TEXT;
+ALTER TABLE memory ADD COLUMN purged_at TEXT;
+ALTER TABLE memory ADD COLUMN purged_by TEXT;
+ALTER TABLE memory_collection ADD COLUMN forgotten_at TEXT;
+ALTER TABLE memory_collection ADD COLUMN purged_at TEXT;
+ALTER TABLE memory_collection ADD COLUMN purged_by TEXT;
+CREATE TABLE IF NOT EXISTS lifecycle_tombstone (
+    tombstone_id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL CHECK(entity_type IN ('memory','collection','durable_alias','durable_user_tag','manual_override')),
+    entity_id TEXT NOT NULL,
+    final_version INTEGER,
+    content_checksum TEXT,
+    purged_at TEXT NOT NULL DEFAULT (datetime('now')),
+    actor TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lt_entity ON lifecycle_tombstone(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_lt_purged ON lifecycle_tombstone(purged_at);
+CREATE INDEX IF NOT EXISTS idx_m_forgotten ON memory(forgotten_at);
+CREATE INDEX IF NOT EXISTS idx_m_purged ON memory(purged_at);
+CREATE INDEX IF NOT EXISTS idx_mc_forgotten ON memory_collection(forgotten_at);
+CREATE INDEX IF NOT EXISTS idx_mc_purged ON memory_collection(purged_at);
+-- Backfill forgotten_at for currently-forgotten rows using reliable audit
+-- evidence only (the most recent matching forget audit). Rows with no reliable
+-- timestamp keep NULL and remain ineligible for purge.
+UPDATE memory SET forgotten_at=(
+    SELECT MAX(created_at) FROM audit_log
+    WHERE entity_type='memory' AND entity_id=memory.memory_id AND action='memory_forget'
+) WHERE status='forgotten' AND forgotten_at IS NULL;
+UPDATE memory_collection SET forgotten_at=(
+    SELECT MAX(created_at) FROM audit_log
+    WHERE entity_type='collection' AND entity_id=memory_collection.collection_id AND action='collection_forget'
+) WHERE status='forgotten' AND forgotten_at IS NULL;
+"""
+
+_MIGRATIONS = {
+    "1.0.0": [_SCHEMA_SQL, _DURABLE_SQL, _IDEMPOTENCY_SQL, _AUDIT_SQL, _INDEX_SQL],
+    "1.1.0": [_V110_SQL],
+}
+
+
+def _ver_tuple(version: str):
+    return tuple(int(part) for part in version.split("."))
 
 
 def run_migrations(conn, target_version: str = CORE_SCHEMA_VERSION) -> list[str]:
@@ -132,12 +174,9 @@ def run_migrations(conn, target_version: str = CORE_SCHEMA_VERSION) -> list[str]
     current = get_schema_version(conn)
     applied = []
 
-    if current == target_version:
-        return applied
-
-    for version_sql in sorted(["1.0.0"]):
-        if version_sql > current and version_sql <= target_version:
-            for sql in _MIGRATION_SEQUENCE:
+    for version_sql in sorted(_MIGRATIONS.keys(), key=_ver_tuple):
+        if _ver_tuple(version_sql) > _ver_tuple(current) and _ver_tuple(version_sql) <= _ver_tuple(target_version):
+            for sql in _MIGRATIONS[version_sql]:
                 execute_script(conn, sql)
             applied.append(version_sql)
 

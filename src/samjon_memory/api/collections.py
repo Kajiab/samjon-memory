@@ -1,9 +1,14 @@
 "Collection API endpoints."""
 from fastapi import APIRouter, Header
 from typing import List
+from pydantic import BaseModel
 from samjon_memory.core.service import CoreService
 from samjon_memory.core.models import CollectionCreate, CollectionUpdate
 router = APIRouter()
+
+
+class _CollectionPurgeRequest(BaseModel):
+    confirmation: str = ""
 
 @router.post("/api/v1/core/collections", response_model=None)
 async def create_collection(body: CollectionCreate, actor: str = Header("system")):
@@ -46,3 +51,15 @@ async def activate_collection(collection_id: str, actor: str = Header("system"))
 async def validate_collection(collection_id: str):
     service = CoreService()
     return service.validate_collection(collection_id)
+
+
+@router.post("/api/v1/core/collections/{collection_id}/restore", response_model=None)
+async def restore_collection(collection_id: str, actor: str = Header("system")):
+    service = CoreService()
+    return service.restore_collection(collection_id, actor=actor)
+
+
+@router.post("/api/v1/core/collections/{collection_id}/purge", response_model=None)
+async def purge_collection(collection_id: str, body: _CollectionPurgeRequest, actor: str = Header("system")):
+    service = CoreService()
+    return service.purge_collection(collection_id, confirmation=body.confirmation, actor=actor)

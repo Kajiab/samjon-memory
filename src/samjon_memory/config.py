@@ -18,6 +18,9 @@ class CoreConfig:
     max_raw_content_chars: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_MAX_RAW_CONTENT_CHARS", "16384")))
     max_raw_content_bytes: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_MAX_RAW_CONTENT_BYTES", "65536")))
     max_query_limit: int = field(default_factory=lambda: int(os.environ.get("SAMJON_CORE_MAX_QUERY_LIMIT", "100")))
+    purge_min_age_days: int = field(default_factory=lambda: int(os.environ.get("SAMJON_LIFECYCLE_PURGE_MIN_AGE_DAYS", "30")))
+    automatic_purge_enabled: bool = field(default_factory=lambda: os.environ.get("SAMJON_LIFECYCLE_AUTOMATIC_PURGE_ENABLED", "false").lower() in ("true", "1", "yes", "on"))
+    purge_confirmation: str = field(default_factory=lambda: os.environ.get("SAMJON_LIFECYCLE_PURGE_CONFIRMATION", "PURGE"))
     cors_origins: list[str] = field(default_factory=lambda: os.environ.get("SAMJON_CORE_CORS_ORIGINS", "*").split(","))
 
     @property

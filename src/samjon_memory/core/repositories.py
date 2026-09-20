@@ -143,7 +143,7 @@ class MemoryRepo:
              source=None, collection_id=None, durable_user_tag=None,
              created_after=None, created_before=None,
              updated_after=None, updated_before=None, limit=20, offset=0,
-             order_by=None):
+             order_by=None, collection_scope=None):
         query = "SELECT m.* FROM memory m WHERE 1=1"
         params = []
         if subject:
@@ -179,6 +179,15 @@ class MemoryRepo:
         if updated_before:
             query += " AND m.updated_at<=?"
             params.append(updated_before)
+        if collection_scope == "standalone":
+            query += " AND (m.collection_id IS NULL OR m.collection_id='')"
+        elif collection_scope == "collection":
+            query += " AND (m.collection_id IS NOT NULL AND m.collection_id!='')"
+        elif collection_scope == "active_knowledge":
+            query += (
+                " AND m.status='active' AND (m.collection_id IS NULL OR m.collection_id=''"
+                " OR m.collection_id IN (SELECT collection_id FROM memory_collection WHERE status='active'))"
+            )
         if order_by:
             query += f" ORDER BY {order_by}"
         else:

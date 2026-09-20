@@ -1,10 +1,16 @@
 "Memory API endpoints."""
 from fastapi import APIRouter, Header
 from typing import Optional
+from pydantic import BaseModel
 from samjon_memory.core.service import CoreService
 from samjon_memory.core.models import MemoryCreate, MemoryUpdate, MemoryQuery
 from samjon_memory.errors import IdempotencyConflict
 router = APIRouter()
+
+
+class _PurgeRequest(BaseModel):
+    confirmation: str = ""
+    expected_version: Optional[int] = None
 
 @router.post("/api/v1/core/memories", response_model=None)
 async def create_memory(body: MemoryCreate, x_idempotency_key: Optional[str] = Header(None), actor: str = Header("system")):
@@ -45,3 +51,22 @@ async def supersede_memory(memory_id: str, replacement_id: str, actor: str = Hea
 async def forget_memory(memory_id: str, actor: str = Header("system")):
     service = CoreService()
     return service.forget_memory(memory_id, actor=actor)
+
+
+@router.post("/api/v1/core/memories/{memory_id}/activate", response_model=None)
+async def activate_memory(memory_id: str, expected_version: Optional[int] = None, actor: str = Header("system")):
+    service = CoreService()
+    return service.activate_memory(memory_id, expected_version=expected_version, actor=actor)
+
+
+@router.post("/api/v1/core/memories/{memory_id}/restore", response_model=None)
+async def restore_memory(memory_id: str, actor: str = Header("system")):
+    service = CoreService()
+    return service.restore_memory(memory_id, actor=actor)
+
+
+@router.post("/api/v1/core/memories/{memory_id}/purge", response_model=None)
+async def purge_memory(memory_id: str, body: _PurgeRequest, actor: str = Header("system")):
+    service = CoreService()
+    return service.purge_memory(memory_id, confirmation=body.confirmation,
+                                expected_version=body.expected_version, actor=actor)

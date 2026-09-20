@@ -3,7 +3,7 @@
 # Service
 APP_TITLE = "Samjon Memory Core V1"
 APP_VERSION = "1.0.0"
-CORE_SCHEMA_VERSION = "1.0.0"
+CORE_SCHEMA_VERSION = "1.1.0"
 
 # Core database
 CORE_DB_FILENAME = "samjon_core.sqlite"
@@ -51,6 +51,11 @@ AUDIT_COLLECTION_CREATE = "collection_create"
 AUDIT_COLLECTION_UPDATE = "collection_update"
 AUDIT_COLLECTION_ACTIVATE = "collection_activate"
 AUDIT_COLLECTION_STRUCTURE_CHANGE = "collection_structure_change"
+AUDIT_MEMORY_RESTORE = "memory_restore"
+AUDIT_COLLECTION_RESTORE = "collection_restore"
+AUDIT_MEMORY_PURGE = "memory_purge"
+AUDIT_COLLECTION_PURGE = "collection_purge"
+AUDIT_COLLECTION_FORGET = "collection_forget"
 AUDIT_DURABLE_ALIAS_CHANGE = "durable_alias_change"
 AUDIT_DURABLE_VOCABULARY_CHANGE = "durable_vocabulary_change"
 AUDIT_DURABLE_TAG_CHANGE = "durable_tag_change"
@@ -65,6 +70,11 @@ DEFAULT_READ_TOKEN_PREFIX = "samjon-read-"
 
 # Portal
 PORTAL_ROUTE = "/portal/"
+
+# Lifecycle / purge
+PURGE_CONFIRMATION = "PURGE"
+LIFECYCLE_PURGE_MIN_AGE_DAYS = 30
+LIFECYCLE_AUTOMATIC_PURGE_ENABLED = False
 
 # Schema metadata
 SCHEMA_METADATA_KEY = "core_schema_version"

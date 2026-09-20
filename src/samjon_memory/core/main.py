@@ -11,6 +11,7 @@ from samjon_memory.api.health import router as health_router
 from samjon_memory.api.capabilities import router as capabilities_router
 from samjon_memory.api.memories import router as memories_router
 from samjon_memory.api.collections import router as collections_router
+from samjon_memory.api.audit import router as audit_router
 from samjon_memory.portal.router import router as portal_router
 from samjon_memory.observability.logging import setup_logging
 
@@ -30,6 +31,7 @@ app.include_router(health_router)
 app.include_router(capabilities_router)
 app.include_router(memories_router)
 app.include_router(collections_router)
+app.include_router(audit_router)
 app.include_router(portal_router)
 
 
