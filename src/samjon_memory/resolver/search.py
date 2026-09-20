@@ -15,6 +15,7 @@ from samjon_memory.resolver.constants import (
     BOOST_TITLE,
     BOOST_VOCAB,
     DEFAULT_QUERY_LIMIT,
+    MAX_NEIGHBORS,
     MAX_QUERY_LIMIT,
     RESULT_AMBIGUOUS,
     RESULT_COLLECTION,
@@ -276,7 +277,7 @@ def _empty(query, target):
 
 def search(conn, core_service, query, target=TARGET_AUTO, collection_id=None,
            scope=None, limit=DEFAULT_QUERY_LIMIT, offset=0, allow_stale=False,
-           epsilon=AMBIGUOUS_EPSILON):
+           epsilon=AMBIGUOUS_EPSILON, neighbor_items=0, context_budget=0):
     """Deterministic search over the Resolver projection.
 
     Raises the modelled PROJECTION_STALE error when the match set is stale and
@@ -335,6 +336,7 @@ def search(conn, core_service, query, target=TARGET_AUTO, collection_id=None,
         ]
         if tied:
             results = ([top] + tied)[:limit]
+            _attach_context(conn, results, neighbor_items, context_budget)
             return {
                 "result_type": RESULT_AMBIGUOUS,
                 "resolved_target": target,
@@ -352,6 +354,7 @@ def search(conn, core_service, query, target=TARGET_AUTO, collection_id=None,
 
     total = len(entries)
     page = entries[offset:offset + limit]
+    _attach_context(conn, page, neighbor_items, context_budget)
     return {
         "result_type": page[0]["result_type"],
         "resolved_target": target,
@@ -365,3 +368,73 @@ def search(conn, core_service, query, target=TARGET_AUTO, collection_id=None,
         "limit_used": len(page),
         "results": page,
     }
+def _attach_context(conn, entries, neighbor_items, context_budget):
+    """Attach bounded neighboring-Section context to collection_memory results.
+
+    Neighbors never cross a Collection boundary, use only active (projected)
+    Sections, are ordered by sequence_number ASC, and are bounded by
+    ``neighbor_items`` and ``context_budget`` characters. Truncation is explicit.
+    """
+    if not entries or neighbor_items <= 0:
+        return entries
+    boundary = min(max(1, int(neighbor_items)), MAX_NEIGHBORS)
+
+    def _neighbors_for(entry, sections, idx):
+        picked = []
+        distance = 1
+        while len(picked) < boundary:
+            has_prev = idx - distance >= 0
+            has_next = idx + distance < len(sections)
+            if not has_prev and not has_next:
+                break
+            if has_prev:
+                picked.append((idx - distance, "previous_neighbor"))
+            if len(picked) >= boundary:
+                break
+            if has_next:
+                picked.append((idx + distance, "next_neighbor"))
+            distance += 1
+        return picked
+
+    for entry in entries:
+        if entry["result_type"] != RESULT_COLLECTION_MEMORY:
+            continue
+        cid = entry.get("collection_id")
+        mid = entry.get("memory_id")
+        if not cid or not mid:
+            continue
+        rows = conn.execute(
+            "SELECT entity_id, sequence_number, section_path, raw_content "
+            "FROM resolver_document_snapshot WHERE entity_type=? AND collection_id=? "
+            "ORDER BY (sequence_number IS NULL), sequence_number ASC, entity_id ASC",
+            (RESULT_COLLECTION_MEMORY, cid),
+        ).fetchall()
+        sections = [dict(r) for r in rows]
+        idx = next((i for i, s in enumerate(sections) if s["entity_id"] == mid), None)
+        if idx is None:
+            continue
+        selected = []
+        budget_used = 0
+        truncated = False
+        for (neighbor_index, reason) in _neighbors_for(entry, sections, idx):
+            s = sections[neighbor_index]
+            length = len(s.get("raw_content") or "")
+            if context_budget and context_budget > 0 and budget_used + length > context_budget:
+                truncated = True
+                continue
+            selected.append({
+                "memory_id": s["entity_id"],
+                "sequence_number": s["sequence_number"],
+                "inclusion_reason": reason,
+            })
+            budget_used += length
+        if len(selected) < boundary:
+            truncated = True
+        entry["context"] = {
+            "selected_sections": selected,
+            "sequence_numbers": [s["sequence_number"] for s in selected],
+            "context_budget_used": budget_used,
+            "truncated": truncated,
+            "max_neighbors": boundary,
+        }
+    return entries

@@ -20,3 +20,10 @@ class ResolverQuery(BaseModel):
     offset: int = Field(default=0, ge=0)
     allow_stale: bool = Field(default=False)
     epsilon: Optional[float] = None
+    neighbor_items: int = Field(default=0, ge=0, le=10)
+    context_budget: int = Field(default=0, ge=0)
+
+
+class ResolverSelective(BaseModel):
+    entity_type: str
+    entity_id: str

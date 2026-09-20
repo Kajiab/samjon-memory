@@ -2423,6 +2423,54 @@
           }
         }
       }
+    },
+    "/api/v1/resolver/rebuild/selective": {
+      "post": {
+        "summary": "Resolver Selective Rebuild",
+        "description": "Rebuild one Memory or Collection projection (requires the admin token).",
+        "operationId": "resolver_selective_rebuild_api_v1_resolver_rebuild_selective_post",
+        "parameters": [
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolverSelective"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3149,6 +3197,19 @@
               }
             ],
             "title": "Epsilon"
+          },
+          "neighbor_items": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Neighbor Items",
+            "default": 0
+          },
+          "context_budget": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Context Budget",
+            "default": 0
           }
         },
         "type": "object",
@@ -3156,6 +3217,24 @@
           "query"
         ],
         "title": "ResolverQuery"
+      },
+      "ResolverSelective": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "title": "ResolverSelective"
       },
       "ValidationError": {
         "properties": {

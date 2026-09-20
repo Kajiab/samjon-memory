@@ -6,12 +6,12 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 **Depends on:** Core V1.1 frozen baseline (`docs/core/CORE_V1_FREEZE.md`)
-**Implementation status:** Foundations A, B, and C1 are implemented and tested
-(schema `1.1.0`, resolver readiness, full projection build, atomic rebuild with
-rollback, rebuild/status API, deterministic search + ranking, projection
-freshness, `allow_stale`, and `POST /api/v1/resolver/query`). Selective
-rebuild, context-neighbor expansion, and the Resolver Portal remain PLANNED
-(not implemented).
+**Implementation status:** Foundations A, B, C1, and C2 are implemented and tested
+(schema `1.1.0`, resolver readiness, full projection build, atomic + selective
+rebuild, expansion refresh, deterministic search + ranking, projection
+freshness, `allow_stale`, bounded context expansion, and the
+rebuild/query/selective API). The Resolver Portal remains PLANNED (not
+implemented).
 
 > This is a planning document. No code, migrations, routes, Portal, or
 > capability changes are implemented in this task. Resolver status is

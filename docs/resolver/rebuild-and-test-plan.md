@@ -6,8 +6,9 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 
-> Foundation B (full projection rebuild) is implemented and tested; this
-> document records the design and the remaining Foundation C work.
+> Foundations B and C2 (full + selective rebuild, expansion refresh, and bounded
+> context expansion) are implemented and tested; this document records the
+> design and the Resolver Portal plan.
 
 ## 1. Rebuild Design
 

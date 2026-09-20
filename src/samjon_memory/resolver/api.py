@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, Request
 
 from samjon_memory.core.service import CoreService
-from samjon_memory.resolver.models import ResolverQuery
+from samjon_memory.resolver.models import ResolverQuery, ResolverSelective
 from samjon_memory.resolver.service import ResolverService
 from samjon_memory.security.auth import require_admin, require_read
 
@@ -65,4 +65,14 @@ async def resolver_query(request: Request, body: ResolverQuery, _: bool = Depend
         offset=body.offset,
         allow_stale=body.allow_stale,
         epsilon=body.epsilon,
+        neighbor_items=body.neighbor_items,
+        context_budget=body.context_budget,
     )
+
+
+@router.post("/api/v1/resolver/rebuild/selective", response_model=None)
+async def resolver_selective_rebuild(request: Request, body: ResolverSelective,
+                                     _: bool = Depends(require_admin)):
+    """Rebuild one Memory or Collection projection (requires the admin token)."""
+    svc = _svc(request)
+    return svc.selective_rebuild(_core(request), body.entity_type, body.entity_id)

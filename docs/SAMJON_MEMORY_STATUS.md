@@ -20,7 +20,7 @@
 - Dashboard metrics: Implemented
 - Audit summary, filters, pagination: Implemented
 - Manual Portal verification: PASS
-- Resolver: Foundation C1 (schema 1.1.0, search/ranking/freshness)
+- Resolver: Foundation C2 (schema 1.1.0, selective rebuild + bounded context)
 - MCP readiness: Not ready
 
 ## Core Baseline
@@ -72,7 +72,7 @@ Required configuration:
 
 ## Resolver
 
-- Status: Foundation C1 delivered (search, ranking, freshness); selective rebuild/context/Portal not implemented
+- Status: Foundation C2 delivered (selective rebuild, bounded context); Resolver Portal not implemented
 - Resolver database (samjon_resolver.sqlite): created, schema 1.1.0
 - FTS5 availability check: Implemented (fail-fast RESOLVER_DATABASE_UNAVAILABLE)
 - Resolver migrations: Implemented and idempotent
@@ -98,7 +98,16 @@ Required configuration:
 - Projection freshness (fresh/stale/missing/orphaned from current Core version + checksum): Implemented
 - `allow_stale`: default false -> PROJECTION_STALE; true -> IDs + evidence with freshness=stale and incomplete=true
 - Bounded results + limit/offset pagination: Implemented
-- Not implemented: selective rebuild, context-neighbor expansion, Resolver Portal, embeddings, vector search, AI enrichment, MCP
+- Selective Memory rebuild (standalone or Section + containing Collection projection): Implemented, PROVEN by tests
+- Selective Collection rebuild (Collection + all active Sections + FTS + projection status): Implemented
+- Inactive / forgotten / purged / orphaned projections, FTS rows, and status removed: Implemented
+- Alias / vocabulary / tag / override expansion refresh: Implemented; unsafe/ambiguous impact falls back to full rebuild
+- Selective operations transactional; failure rolls back to the previous usable projection: PROVEN
+- Bounded context expansion (neighboring Sections, sequence ASC, active-only, never cross Collection): Implemented
+- `context_budget` + neighbor count enforced; truncation reported explicitly: PROVEN
+- Selective rebuild API `POST /api/v1/resolver/rebuild/selective` (admin token)
+- Query fields `neighbor_items` + `context_budget`; evidence includes selected Section IDs, sequence numbers, budget used, truncated flag, inclusion reason
+- Not implemented: Resolver Portal, embeddings, vector search, AI enrichment, MCP
 - Semantic search: Not implemented
 - AI enrichment: Not implemented
 - Embeddings: Not implemented
@@ -109,7 +118,7 @@ Required configuration:
 All tests pass with executable evidence:
 
 - Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 238
+- Passed: 257
 - Failed: 0
 - Skipped: 0
 - Verified: 2026-09-20

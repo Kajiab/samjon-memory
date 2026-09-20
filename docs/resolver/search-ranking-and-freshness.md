@@ -6,8 +6,8 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 
-> Foundation C1 (search, ranking, freshness) is implemented and tested; this
-> document records design, rules, and the remaining Foundation C2 work.
+> Foundations C1 and C2 (search, ranking, freshness, and bounded context
+> expansion) are implemented and tested; this document records the design/rules.
 
 ## 1. FTS5 Query Handling (Decision 10)
 

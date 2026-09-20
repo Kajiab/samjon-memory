@@ -152,8 +152,16 @@ class ResolverService:
             "entities": [dict(r) for r in rows],
         }
 
+    def selective_rebuild(self, core_service, entity_type, entity_id):
+        """Selectively rebuild one Memory or Collection (Admin action)."""
+        from samjon_memory.resolver import selective as _sel
+
+        return _sel.selective_rebuild(core_service, self.database_path,
+                                      entity_type, entity_id)
+
     def search(self, core_service, query, target="auto", collection_id=None,
-               scope=None, limit=10, offset=0, allow_stale=False, epsilon=None):
+               scope=None, limit=10, offset=0, allow_stale=False, epsilon=None,
+               neighbor_items=0, context_budget=0):
         """Deterministic search over the Resolver projection (Foundation C1)."""
         from samjon_memory.resolver.constants import AMBIGUOUS_EPSILON
         from samjon_memory.resolver import search as _search
@@ -169,6 +177,8 @@ class ResolverService:
             offset=offset,
             allow_stale=allow_stale,
             epsilon=AMBIGUOUS_EPSILON if epsilon is None else epsilon,
+            neighbor_items=neighbor_items,
+            context_budget=context_budget,
         )
 
     def projection_audit(self, limit: int = 20) -> list:

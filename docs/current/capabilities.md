@@ -42,10 +42,12 @@ Proven capabilities for Samjon Memory Core V1.
 | Resolver deterministic ranking | PROVEN | title/exact-subject above content; alias/vocab/tag boosts; deterministic tie-break; no recency |
 | Resolver safe FTS5 query parsing | PROVEN | quotes/parens/hyphens/colons/asterisks/Thai punctuation/operators/empty/oversized |
 | Resolver freshness + allow_stale | PROVEN | fresh/stale/missing/orphaned from Core version+checksum; allow_stale |
+| Resolver selective rebuild + expansion refresh | PROVEN | memory/collection selective; inactive/orphaned cleanup; fallback to full |
+| Resolver bounded context expansion | PROVEN | neighbors ordered by sequence, active-only, no cross-Collection, budget+truncation |
 | OpenAPI | PROVEN | drift test |
 
 ## 3. Limitations
 
 - Resolver search/ranking/freshness: Implemented (Foundation C1)
-- No selective rebuild / context-neighbor expansion / Resolver Portal (Foundation C2)
+- No Resolver Portal (separate foundation)
 - No semantic search / embeddings / vector search / AI enrichment / MCP

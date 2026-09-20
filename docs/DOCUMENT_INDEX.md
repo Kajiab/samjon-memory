@@ -128,7 +128,9 @@ samjon-memory/docs/SAMJON_MEMORY_STATUS.md
 | Resolver atomic rebuild + rollback | PROVEN | Foundation B rebuild tests |
 | Resolver search + deterministic ranking | PROVEN | Foundation C1 search tests |
 | Resolver projection freshness + allow_stale | PROVEN | Foundation C1 freshness tests |
-| Selective rebuild / context-neighbor expansion / Resolver Portal | NOT STARTED | Resolver Foundation C2 + Portal |
+| Resolver selective rebuild + expansion refresh | PROVEN | Foundation C2 selective tests |
+| Resolver bounded context expansion | PROVEN | Foundation C2 context tests |
+| Resolver Portal | NOT STARTED | Resolver Portal (separate foundation) |
 | Semantic search | NOT STARTED | Deferred |
 | AI enrichment | NOT STARTED | Deferred |
 | Embeddings/vector search | NOT STARTED | ADR required |
