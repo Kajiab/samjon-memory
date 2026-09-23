@@ -102,11 +102,11 @@ def test_purge_disabled_until_retention(client, temp_db):
     from samjon_memory.core.service import CoreService
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
-    _forgotten_memory(svc)  # fresh -> not eligible
+    mem = _forgotten_memory(svc)  # fresh -> not eligible
     body = client.get("/portal/admin").text
     assert "Pending" in body
-    assert "disabled>Purge</button>" in body        # not yet eligible
-    assert 'name="confirmation"' not in body         # no enabled purge form
+    assert "disabled>Purge</button>" in body                        # not yet eligible
+    assert f'action="/portal/memories/{mem["memory_id"]}/purge"' not in body  # no enabled purge form for it
 
 
 def test_purge_enabled_when_retention_met(client, temp_db):

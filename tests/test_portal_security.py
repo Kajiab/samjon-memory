@@ -162,3 +162,53 @@ def test_validation_errors_human_readable(client, temp_db):
     assert "Current Sections: 0" in resp.text
     assert "Missing Sections: 3" in resp.text
     assert "Not ready to activate" in resp.text
+# ---- Media security ----
+
+
+def _jpeg_bytes():
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 6), (200, 30, 30)).save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+def test_media_mutations_still_require_auth(client, temp_db):
+    """Media mutations require HTTP Basic even with a valid internal back target."""
+    from samjon_memory.core.service import CoreService
+    from fastapi.testclient import TestClient
+    svc = CoreService(database_path=temp_db)
+    app.state.service = svc
+    mem = svc.create_memory({"subject": "auth", "raw_content": "c", "source": "t"})
+    r = svc.upload_media("memory", mem["memory_id"], _jpeg_bytes(), actor="admin")
+    c = TestClient(app)  # no credentials
+    assert c.get(f"/portal/media/{r['media_id']}/thumb").status_code == 401
+    assert c.post(f"/portal/media/{r['media_id']}/cover",
+                  data={"back": "/portal/collections/x#section-y"}).status_code == 401
+
+
+def test_media_mutation_unapproved_origin_rejected(client, temp_db):
+    from samjon_memory.core.service import CoreService
+    svc = CoreService(database_path=temp_db)
+    app.state.service = svc
+    mem = svc.create_memory({"subject": "origin", "raw_content": "c", "source": "t"})
+    r = svc.upload_media("memory", mem["memory_id"], _jpeg_bytes(), actor="admin")
+    resp = client.post(f"/portal/media/{r['media_id']}/cover",
+                       headers={"Origin": "http://evil.example"}, follow_redirects=False)
+    assert resp.status_code == 403
+
+
+def test_unsafe_media_return_cannot_redirect_external(client, temp_db):
+    """A hostile `back` cannot turn a media mutation into an open redirect."""
+    from samjon_memory.core.service import CoreService
+    svc = CoreService(database_path=temp_db)
+    app.state.service = svc
+    mem = svc.create_memory({"subject": "redirect", "raw_content": "c", "source": "t"})
+    r = svc.upload_media("memory", mem["memory_id"], _jpeg_bytes(), actor="admin")
+    for evil in ("https://evil.example", "//evil.example", "/portal/collections/../../x"):
+        resp = client.post(f"/portal/media/{r['media_id']}/cover", data={"back": evil},
+                           headers={"Origin": "http://localhost:8100"}, follow_redirects=False)
+        loc = resp.headers.get("location", "")
+        assert "evil.example" not in loc
+        assert loc.startswith("/portal/memories/")  # internal fallback
+        assert ".." not in loc

@@ -75,14 +75,17 @@ def test_parse_neutralizes_punctuation_and_operators():
     )
     assert reason == "ok"
     assert set(tokens) == {"basil", "or", "curry", "soup", "mint", "extra", "and", "not"}
-    assert matcher.startswith("\"basil\"")
-    # No raw FTS operator or punctuation reaches the MATCH expression directly.
-    assert " OR " not in matcher
-    assert "(" not in matcher and ")" not in matcher
-    assert "-" not in matcher and ":" not in matcher and "*" not in matcher
-    # Every entity is a double-quoted token (safe phrase), not raw syntax.
+    # Hyphens and colons typed by the user never reach the MATCH string.
+    assert "-" not in matcher and ":" not in matcher
+    # Every entity is a double-quoted token built only from normalized tokens.
     for token in tokens:
         assert f'"{token}"' in matcher
+    # The `*` wildcard is only ever code-added immediately after a closing
+    # double-quote (a FTS5 phrase-prefix term); a bare user `*` is never present
+    # and no raw FTS operator reaches MATCH as syntax.
+    for i, ch in enumerate(matcher):
+        if ch == "*":
+            assert i > 0 and matcher[i - 1] == '"'
 
 
 def test_parse_handles_thai_text_and_punctuation():
@@ -105,7 +108,11 @@ def test_parse_bounds_token_count():
 
 def test_safe_match_expr():
     assert query_mod.safe_match_expr("") == ""
-    assert query_mod.safe_match_expr("basil") == '"basil"'
+    # A token of at least MIN_PREFIX_LENGTH becomes a code-added prefix term;
+    # the prefix term also covers the exact token (a token starts with itself).
+    assert query_mod.safe_match_expr("basil") == '"basil"*'
+    # A single-character token is exact-only (below MIN_PREFIX_LENGTH).
+    assert query_mod.safe_match_expr("a") == '"a"'
 
 # ---- Search + ranking ----------------------------------------------------
 
@@ -216,6 +223,231 @@ def test_ambiguous_result(seed):
     assert result["count"] == 2
     types = {e["result_type"] for e in result["results"]}
     assert types == {"standalone_memory", "collection"}
+# ---- Prefix + Thai substring matching --------------------------------------
+
+
+def _build_prefix_search(core, resolver_path):
+    """Seed focused Thai/English prefix-matching fixtures and rebuild."""
+    # Title is exactly a Thai word; shorter query must match as a prefix.
+    m_cat = core.create_memory(
+        {"subject": "pets", "title": "แมวไทย", "raw_content": "แมวไทยเป็นสัตว์",
+         "source": "t", "scope": "household", "language": "th"})
+    core.activate_memory(m_cat["memory_id"])
+    # Query term present only inside a content token (infix), never at its start.
+    m_content = core.create_memory(
+        {"subject": "pets2", "title": "อื่นๆ", "raw_content": "ข้อมูลแมวพันธุ์ผสม",
+         "source": "t", "scope": "household", "language": "th"})
+    core.activate_memory(m_content["memory_id"])
+    # Collection whose title contains the query term mid-token (infix).
+    coll_infix = core.create_collection(
+        {"subject": "guides", "collection_type": "fact", "title": "คู่มือแมวไทย",
+         "summary": "เกี่ยวกับแมว", "source": "t", "scope": "household", "language": "th"})
+    core.activate_collection(coll_infix["collection_id"])
+    # Collection section whose title contains the query term mid-token (infix).
+    coll_food = core.create_collection(
+        {"subject": "food", "collection_type": "fact", "title": "คู่มืออาหาร",
+         "summary": "เมนูต่างๆ", "source": "t", "scope": "household", "language": "th"})
+    sec_food = core.create_memory(
+        {"subject": "food", "title": "อาหารแมวไทย", "raw_content": "สูตรอาหารแมว",
+         "source": "t", "scope": "household", "language": "th"})
+    core.add_memory_to_collection(coll_food["collection_id"], sec_food["memory_id"], 1)
+    core.activate_memory(sec_food["memory_id"])
+    core.activate_collection(coll_food["collection_id"])
+    # Monstera: Thai leading-prefix ("มอน" -> "มอนสเตอร่า").
+    m_monstera = core.create_memory(
+        {"subject": "plants", "title": "มอนสเตอร่า", "raw_content": "green leaf",
+         "source": "t", "scope": "household", "language": "th"})
+    core.activate_memory(m_monstera["memory_id"])
+    # Watering: English leading-prefix ("water" -> "watering").
+    m_water = core.create_memory(
+        {"subject": "garden", "title": "watering", "raw_content": "plants need care",
+         "source": "t", "scope": "household", "language": "en"})
+    core.activate_memory(m_water["memory_id"])
+    # Air-conditioner: Thai leading-prefix ("เครื่องปรับ" -> "เครื่องปรับอากาศ").
+    m_cool = core.create_memory(
+        {"subject": "home", "title": "เครื่องปรับอากาศ", "raw_content": "ติดตั้ง",
+         "source": "t", "scope": "household", "language": "th"})
+    core.activate_memory(m_cool["memory_id"])
+    rsvc = ResolverService(database_path=resolver_path)
+    rsvc.full_rebuild(core)
+    return {
+        "core": core, "rsvc": rsvc, "m_cat": m_cat, "m_monstera": m_monstera,
+        "m_water": m_water, "m_cool": m_cool, "coll_infix": coll_infix, "sec_food": sec_food,
+    }
+
+
+def test_prefix_thai_title_finds(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    res = ctx["rsvc"].search(ctx["core"], "แมว", target="memory", allow_stale=False)
+    assert res["count"] >= 1
+    ids = {e["identity"]["memory_id"] for e in res["results"]
+           if e["result_type"] == "standalone_memory"}
+    assert ctx["m_cat"]["memory_id"] in ids
+    cat = next(e for e in res["results"]
+               if e.get("memory_id") == ctx["m_cat"]["memory_id"])
+    assert "title_prefix_match" in cat["match_reasons"]
+
+
+def test_prefix_finds_collection_title_infix(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    res = ctx["rsvc"].search(ctx["core"], "แมว", target="collection", allow_stale=False)
+    assert res["count"] >= 1
+    matched = [e for e in res["results"]
+               if e.get("collection_id") == ctx["coll_infix"]["collection_id"]]
+    assert matched
+    assert any("title_substring_match" in e["match_reasons"] for e in matched)
+
+
+def test_prefix_finds_section_title_infix(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    res = ctx["rsvc"].search(ctx["core"], "แมว", target="memory", allow_stale=False)
+    sections = [e for e in res["results"] if e["result_type"] == "collection_memory"]
+    assert sections
+    assert any("title_substring_match" in e["match_reasons"] for e in sections)
+
+
+def test_exact_ranks_above_prefix_only(temp_db, temp_resolver_db):
+    core = _make_core(temp_db)
+    exact = core.create_memory(
+        {"subject": "a", "title": "แมวไทย", "raw_content": "แมวไทยเป็นสัตว์", "source": "t"})
+    core.activate_memory(exact["memory_id"])
+    prefix_only = core.create_memory(
+        {"subject": "b", "title": "อันอื่น", "raw_content": "เนื้อแมวไทยเต็มรูปแบบ",
+         "source": "t"})
+    core.activate_memory(prefix_only["memory_id"])
+    r = ResolverService(database_path=temp_resolver_db)
+    r.full_rebuild(core)
+    res = r.search(core, "แมวไทย", target="memory", allow_stale=False)
+    ids = [e["identity"]["memory_id"] for e in res["results"]
+           if e["result_type"] == "standalone_memory"]
+    assert ids
+    assert ids[0] == exact["memory_id"]  # exact-title outranks prefix/infix-only
+    top = next(e for e in res["results"] if e["result_type"] == "standalone_memory")
+    assert "exact_title_match" in top["match_reasons"]
+
+
+def test_title_prefix_ranks_above_content_prefix(temp_db, temp_resolver_db):
+    core = _make_core(temp_db)
+    title_hit = core.create_memory(
+        {"subject": "a", "title": "แมวไทย", "raw_content": "เรื่องแมว", "source": "t"})
+    core.activate_memory(title_hit["memory_id"])
+    content_hit = core.create_memory(
+        {"subject": "b", "title": "อื่นๆ", "raw_content": "พันธุ์แมวสยาม", "source": "t"})
+    core.activate_memory(content_hit["memory_id"])
+    r = ResolverService(database_path=temp_resolver_db)
+    r.full_rebuild(core)
+    res = r.search(core, "แมว", target="memory", allow_stale=False)
+    ids = [e["identity"]["memory_id"] for e in res["results"]
+           if e["result_type"] == "standalone_memory"]
+    assert ids and ids[0] == title_hit["memory_id"]
+    title_entry = next(e for e in res["results"]
+                       if e.get("memory_id") == title_hit["memory_id"])
+    assert "title_prefix_match" in title_entry["match_reasons"]
+
+
+def test_thai_prefix_monstera(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    res = ctx["rsvc"].search(ctx["core"], "มอน", target="memory", allow_stale=False)
+    ids = [e["identity"]["memory_id"] for e in res["results"]
+           if e["result_type"] == "standalone_memory"]
+    assert ctx["m_monstera"]["memory_id"] in ids
+    top = res["results"][0]
+    assert top.get("memory_id") == ctx["m_monstera"]["memory_id"]
+
+
+def test_thai_prefix_air_conditioner(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    res = ctx["rsvc"].search(ctx["core"], "เครื่องปรับ", target="memory",
+                             allow_stale=False)
+    ids = [e["identity"]["memory_id"] for e in res["results"]
+           if e["result_type"] == "standalone_memory"]
+    assert ctx["m_cool"]["memory_id"] in ids
+    top = res["results"][0]
+    assert top.get("memory_id") == ctx["m_cool"]["memory_id"]
+    assert "title_prefix_match" in top["match_reasons"]
+
+
+def test_english_prefix_water_watering(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    res = ctx["rsvc"].search(ctx["core"], "water", target="memory", allow_stale=False)
+    ids = [e["identity"]["memory_id"] for e in res["results"]
+           if e["result_type"] == "standalone_memory"]
+    assert ctx["m_water"]["memory_id"] in ids
+    top = res["results"][0]
+    assert top.get("memory_id") == ctx["m_water"]["memory_id"]
+    assert "title_prefix_match" in top["match_reasons"]
+
+
+def test_query_operator_and_punctuation_safe(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    # Quotes, parentheses, colon, asterisk and FTS operators must be neutralized,
+    # never turned into raw MATCH syntax or raise.
+    res = ctx["rsvc"].search(
+        ctx["core"], 'แมว OR "water" (x) -y:z* AND NOT',
+        target="auto", allow_stale=False)
+    assert res["result_type"] in {
+        "standalone_memory", "collection", "collection_memory",
+        "collection_with_selected_memories", "ambiguous", "no_match"}
+    # Hyphens/colons never survive into the internal matcher either.
+    matcher, _, _ = query_mod.parse_query('แมว OR "water" (x) -y:z* AND NOT')
+    assert "-" not in matcher and ":" not in matcher
+
+
+def test_wildcard_only_query_rejected(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    matcher, tokens, _ = query_mod.parse_query("***  (( )) :: --")
+    assert matcher is None and tokens == []
+    res = ctx["rsvc"].search(ctx["core"], "****", target="auto", allow_stale=False)
+    assert res["result_type"] == "no_match"
+    assert res["count"] == 0
+
+
+def test_results_deduplicated(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    res = ctx["rsvc"].search(ctx["core"], "แมว", target="auto", allow_stale=False)
+    keys = [(e.get("result_type"), e.get("collection_id"), e.get("memory_id"))
+            for e in res["results"]]
+    assert len(keys) == len(set(keys))
+
+
+def test_prefix_ranking_deterministic(temp_db, temp_resolver_db):
+    ctx = _build_prefix_search(_make_core(temp_db), temp_resolver_db)
+    first = ctx["rsvc"].search(ctx["core"], "แมว", target="auto", allow_stale=False)
+    for _ in range(3):
+        assert ctx["rsvc"].search(ctx["core"], "แมว", target="auto", allow_stale=False) == first
+
+
+def test_prefix_inactive_entities_not_returned(temp_db, temp_resolver_db):
+    core = _make_core(temp_db)
+    # Draft (never activated) must not be returned by a prefix query.
+    core.create_memory(
+        {"subject": "s", "title": "แมวไทยDraft", "raw_content": "ไม่activated", "source": "t"})
+    r = ResolverService(database_path=temp_resolver_db)
+    r.full_rebuild(core)
+    res = r.search(core, "แมว", target="auto", allow_stale=False)
+    assert res["result_type"] == "no_match"
+    assert res["count"] == 0
+
+
+def test_prefix_search_leaves_core_unchanged(temp_db, temp_resolver_db):
+    core = _make_core(temp_db)
+    ctx = _build_prefix_search(core, temp_resolver_db)
+    before = _sha(temp_db)
+    before_audit = len(core.get_audit_records(limit=100000))
+    ctx["rsvc"].search(core, "แมว", target="auto", allow_stale=False)
+    ctx["rsvc"].search(core, "มอน", target="memory", allow_stale=False)
+    ctx["rsvc"].search(core, "water", target="memory", allow_stale=False)
+    assert _sha(temp_db) == before
+    assert len(core.get_audit_records(limit=100000)) == before_audit
+
+
+def test_single_char_token_exact_only():
+    matcher, tokens, _reason = query_mod.parse_query("x")
+    assert matcher == '"x"'
+    assert "*" not in matcher
+    assert tokens == ["x"]
+
+
 # ---- Bounding -------------------------------------------------------------
 
 

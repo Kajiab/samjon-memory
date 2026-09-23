@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter
 
+from samjon_memory.constants import APP_VERSION, CORE_SCHEMA_VERSION
+
 router = APIRouter()
 
 
@@ -9,8 +11,8 @@ router = APIRouter()
 async def capabilities():
     return {
         "service": "samjon-memory-core",
-        "version": "1.0.0",
-        "core_schema_version": "1.0.0",
+        "version": APP_VERSION,
+        "core_schema_version": CORE_SCHEMA_VERSION,
         "routes": [
             "GET /health",
             "GET /ready",

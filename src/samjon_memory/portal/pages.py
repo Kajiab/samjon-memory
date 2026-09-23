@@ -18,6 +18,240 @@ def _e(text) -> str:
     return _html.escape(str(text) if text is not None else "")
 
 
+# ---- Media rendering helpers ------------------------------------------------
+# Only media metadata (ids + validated alt/caption) is rendered - never binary
+# bytes. Source URLs point at Portal-authenticated media routes.
+
+def _media_original_url(media_id: str) -> str:
+    return f"/portal/media/{media_id}/original"
+
+
+def _media_thumb_url(media_id: str) -> str:
+    return f"/portal/media/{media_id}/thumb"
+
+
+# ---- Read-only media view models --------------------------------------------
+# Presentation-ready data for the Portal. Only media_id + authenticated media
+# URLs are exposed; never relative_path, thumbnail_path, or filesystem paths.
+
+def _media_vm(m) -> dict:
+    return {
+        "media_id": m["media_id"],
+        "thumb_url": _media_thumb_url(m["media_id"]),
+        "original_url": _media_original_url(m["media_id"]),
+        "alt": m.get("alt_text") or "",
+        "caption": m.get("caption") or "",
+        "is_cover": bool(m.get("is_cover")),
+    }
+
+
+def build_gallery_vm(media) -> list:
+    """Ordered gallery view model (display_order preserved from CoreService)."""
+    return [_media_vm(m) for m in (media or [])]
+
+
+def build_cover_vm(media):
+    """Cover view model, falling back to the first illustration when no cover set."""
+    items = build_gallery_vm(media)
+    if not items:
+        return None
+    for it in items:
+        if it["is_cover"]:
+            return it
+    return items[0]
+
+
+# ---- Library subject-domain catalog (presentation constant) ---------------
+# Canonical subject domain = the prefix before ':'. Category cards group many
+# individual subjects under one domain so new subject domains remain possible.
+
+SUBJECT_CATEGORIES = [
+    {"key": "people", "name": "People", "hint": "บุคคลและความชอบ", "domains": ["person"]},
+    {"key": "household", "name": "Household", "hint": "ข้อมูลที่ใช้ร่วมกันในบ้าน", "domains": ["household"]},
+    {"key": "plants", "name": "Plants", "hint": "ต้นไม้และการดูแล", "domains": ["plant"]},
+    {"key": "pets", "name": "Pets", "hint": "สัตว์เลี้ยงและการดูแล", "domains": ["pet"]},
+    {"key": "devices", "name": "Devices", "hint": "อุปกรณ์และเครื่องใช้", "domains": ["device"]},
+    {"key": "equipment", "name": "Equipment", "hint": "เครื่องมือและอุปกรณ์", "domains": ["equipment"]},
+    {"key": "locations", "name": "Locations", "hint": "ห้องและสถานที่", "domains": ["location"]},
+    {"key": "music", "name": "Music", "hint": "เพลงและความชอบด้านเสียง", "domains": ["music", "playlist"]},
+    {"key": "routines", "name": "Routines", "hint": "กิจวัตรและขั้นตอน", "domains": ["routine", "activity"]},
+    {"key": "inventory", "name": "Inventory", "hint": "สิ่งของและตำแหน่งจัดเก็บ", "domains": ["inventory", "item", "supply"]},
+    {"key": "systems", "name": "Systems", "hint": "ระบบ บริการ และ Automation", "domains": ["system", "service", "integration", "automation"]},
+    {"key": "other", "name": "Other", "hint": "ความรู้อื่น ๆ", "domains": []},
+]
+
+_OTHER_CATEGORY = next(c for c in SUBJECT_CATEGORIES if c["key"] == "other")
+_CATEGORY_BY_DOMAIN = {}
+for _c in SUBJECT_CATEGORIES:
+    for _d in _c["domains"]:
+        _CATEGORY_BY_DOMAIN[_d] = _c
+
+
+def _subject_domain(subject) -> str:
+    s = str(subject or "").strip()
+    if ":" in s:
+        head = s.split(":", 1)[0].strip()
+        return head or s
+    return s
+
+
+def domain_is_catalogued(domain: str) -> bool:
+    return domain in _CATEGORY_BY_DOMAIN
+
+
+def category_by_key(key: str):
+    for c in SUBJECT_CATEGORIES:
+        if c["key"] == key:
+            return c
+    return None
+
+
+def _category_for_domain(domain: str):
+    return _CATEGORY_BY_DOMAIN.get(domain, _OTHER_CATEGORY)
+
+
+def _category_for_subject(subject):
+    return _category_for_domain(_subject_domain(subject))
+
+
+def category_model(active) -> list:
+    """Build the presentation category catalog with active counts.
+
+    ``active`` = {"collections": [...], "memories": [...]} (bounded, from
+    CoreService.library_active). Counting is pure read-only presentation.
+    """
+    cats = {c["key"]: dict(c, memories=0, collections=0) for c in SUBJECT_CATEGORIES}
+
+    def _bucket(subject):
+        return _category_for_subject(subject)["key"]
+
+    for m in active.get("memories", []):
+        cats[_bucket(m.get("subject"))]["memories"] += 1
+    for c in active.get("collections", []):
+        cats[_bucket(c.get("subject"))]["collections"] += 1
+    return [cats[c["key"]] for c in SUBJECT_CATEGORIES]
+
+
+def _category_matches(category, subject) -> bool:
+    doms = category.get("domains") or []
+    if doms:
+        return _subject_domain(subject) in doms
+    # Other: any domain not covered by a named category.
+    return not domain_is_catalogued(_subject_domain(subject))
+
+
+def subject_domain(subject) -> str:
+    """Public: canonical subject domain = the prefix before ':'."""
+    return _subject_domain(subject)
+
+
+def category_matches(category, subject) -> bool:
+    """Public: does an entity's subject belong to the given category?"""
+    return _category_matches(category, subject)
+
+
+def cover_thumb(media) -> str:
+    """Return a cover thumbnail <img> (or a placeholder) for a media list."""
+    if not media:
+        return '<div class="media-cover placeholder" aria-hidden="true">No cover</div>'
+    cover = next((m for m in media if m.get("is_cover")), media[0])
+    alt = _e(cover.get("alt_text") or cover.get("caption") or "Cover image")
+    return f'<img class="media-cover" src="{_media_thumb_url(cover["media_id"])}" alt="{alt}">'
+
+
+def _media_section(media, entity_type: str = "", entity_id: str = "",
+                   admin: bool = False, back_target: str = "") -> str:
+    """Render a media gallery. Read-only when ``admin`` is False.
+
+    ``back_target`` (optional) is an internal Portal path embedded as a hidden
+    ``back`` field on every admin mutation form, so inline Section media controls
+    redirect back to the Collection detail page after a mutation.
+    """
+    media = media or []
+    hidden_back = ('<input type="hidden" name="back" value="' + _e(back_target) + '">') \
+        if (admin and back_target) else ""
+    if not media:
+        items = '<div class="empty-state"><p>No images yet.</p></div>'
+    else:
+        cards = []
+        for idx, m in enumerate(media):
+            mid = m["media_id"]
+            alt = _e(m.get("alt_text") or "")
+            cap = _e(m.get("caption") or "")
+            cover_badge = '<span class="badge active">Cover</span>' if m.get("is_cover") else ""
+            caption_bits = []
+            if cap:
+                caption_bits.append('<span class="cap">' + cap + "</span>")
+            if alt:
+                caption_bits.append('<span class="alt">[alt: ' + alt + " ]</span>")
+            img = ('<img src="' + _media_thumb_url(mid) + '" alt="' + alt + '">')
+            item = '<figure class="media-item">' + img + "".join(caption_bits) + cover_badge
+            if admin:
+                disabled = ' disabled' if m.get("is_cover") else ""
+                left_dis = ' disabled' if idx == 0 else ""
+                right_dis = ' disabled' if idx == len(media) - 1 else ""
+                item += (
+                    '<figcaption class="media-controls">'
+                    '<form method="post" action="/portal/media/' + mid + '/cover">'
+                    + hidden_back
+                    + '<button type="submit" class="btn btn-xsmall"' + disabled + '>Cover</button></form>'
+                    '<form method="post" action="/portal/media/' + mid + '/move-left">'
+                    + hidden_back
+                    + '<button type="submit" class="btn btn-xsmall"' + left_dis + '>&larr;</button></form>'
+                    '<form method="post" action="/portal/media/' + mid + '/move-right">'
+                    + hidden_back
+                    + '<button type="submit" class="btn btn-xsmall"' + right_dis + '>&rarr;</button></form>'
+                    '<form method="post" action="/portal/media/' + mid + '/remove" '
+                    "onsubmit=\"return window.confirm('Remove this image?')\">"
+                    + hidden_back
+                    + '<button type="submit" class="btn btn-xsmall btn-danger">Remove</button></form>'
+                    '<details class="media-edit"><summary>Edit</summary>'
+                    '<form method="post" action="/portal/media/' + mid + '/metadata">'
+                    + hidden_back
+                    + '<label>Alt text<input name="alt_text" value="' + alt + '" maxlength="500" title="Short image description shown when the image cannot load (accessibility)."></label>'
+                    '<label>Caption<input name="caption" value="' + cap + '" maxlength="2000" title="Optional caption displayed under the image."></label>'
+                    '<button type="submit" class="btn btn-xsmall">Save</button></form>'
+                    '<form method="post" action="/portal/media/' + mid + '/replace" '
+                    'enctype="multipart/form-data">'
+                    + hidden_back
+                    + '<label>Replace<input type="file" name="file" '
+                    'accept="image/jpeg,image/png,image/webp"></label>'
+                    '<button type="submit" class="btn btn-xsmall">Replace</button></form>'
+                    "</details></figcaption>"
+                )
+            cards.append(item + "</figure>")
+        items = '<div class="media-gallery">' + "".join(cards) + "</div>"
+    upload = ""
+    if admin:
+        upload = (
+            '<form method="post" action="/portal/media/upload" '
+            'enctype="multipart/form-data" class="media-upload">'
+            + hidden_back
+            + '<input type="hidden" name="entity_type" value="' + _e(entity_type) + '">'
+            '<input type="hidden" name="entity_id" value="' + _e(entity_id) + '">'
+            '<input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>'
+            '<input name="alt_text" placeholder="Alt text" maxlength="500" title="Short image description for accessibility.">'
+            '<input name="caption" placeholder="Caption" maxlength="2000" title="Optional caption shown under the image.">'
+            '<button type="submit" class="btn">Upload image</button></form>'
+        )
+    return '<section class="card media-section"><h2>Images</h2>' + upload + items + "</section>"
+
+
+def _section_media_manager(section, cid) -> str:
+    """Expandable inline Section media manager for the Collection Admin detail."""
+    mid = section["memory_id"]
+    media = section.get("media") or []
+    back = "/portal/collections/" + _e(cid) + "#section-" + _e(mid)
+    return (
+        '<details class="section-media" data-section-media="1">'
+        '<summary>จัดการรูปภาพของบท</summary>'
+        + _media_section(media, "memory", mid, admin=True, back_target=back)
+        + '<p><a class="btn btn-xsmall btn-ghost" href="/portal/memories/' + _e(mid)
+        + '">Open full Section page</a></p>'
+        + "</details>"
+    )
+
+
 def _is_error_message(message: str) -> bool:
     if message.startswith("error"):
         return True
@@ -51,6 +285,7 @@ _MESSAGE_TEXT = {
     "cancelled": "Action cancelled - nothing was changed.",
     "restored": "Record restored to draft.",
     "purged": "Record purged permanently.",
+    "resolver_rebuilt": "Rebuild complete. The search index was updated.",
 }
 
 
@@ -89,21 +324,44 @@ def _page(body: str) -> str:
     )
 
 
+def _brand_mark() -> str:
+    """Drawn SVG book-spine mark (geometric, decorative, hidden from AT)."""
+    return ('<svg class="nav-brand-mark" width="20" height="20" viewBox="0 0 20 20" '
+            'aria-hidden="true" focusable="false">'
+            '<rect x="3" y="3" width="14" height="14" rx="2" fill="#146e6b"/>'
+            '<line x1="6" y1="6" x2="6" y2="15" stroke="#0f5c59" stroke-width="1.6"/>'
+            '<line x1="10" y1="6" x2="10" y2="15" stroke="#0f5c59" stroke-width="1.6"/>'
+            '<line x1="14" y1="6" x2="14" y2="15" stroke="#0f5c59" stroke-width="1.6"/>'
+            '</svg>')
+
+
 def _navbar(active: str = "") -> str:
-    links = [
-        ("dashboard", "/portal/", "Dashboard"),
+    user_links = [
+        ("library", "/portal/", "Library"),
         ("memories", "/portal/memories", "Memories"),
         ("collections", "/portal/collections", "Collections"),
+        ("status", "/portal/status", "Status"),
+    ]
+    admin_links = [
         ("admin", "/portal/admin", "Administration"),
         ("audit", "/portal/audit", "Audit"),
+        ("resolver", "/portal/resolver/", "Resolver Debug"),
     ]
-    items = "".join(
-        f'<a class="nav{" active" if key == active else ""}" href="{_e(href)}"'
-        f'{" aria-current=\"page\"" if key == active else ""}>{_e(label)}</a>'
-        for key, href, label in links
-    )
+
+    def _item(key, href, label):
+        cls = "nav" + (" active" if key == active else "")
+        current = ' aria-current="page"' if key == active else ""
+        return f'<a class="{cls}" href="{_e(href)}"{current}>{_e(label)}</a>'
+
+    user_items = "".join(_item(k, h, l) for k, h, l in user_links)
+    admin_items = "".join(_item(k, h, l) for k, h, l in admin_links)
     return ('<header class="site-header">'
-            f'<nav class="navbar" aria-label="Primary">{items}</nav></header>')
+            f'<nav class="navbar" aria-label="Primary">'
+            f'<a class="nav-brand" href="/portal/">{_brand_mark()}<span>Samjon Memory</span></a>'
+            f'<div class="nav-user">{user_items}</div>'
+            '<span class="nav-sep" aria-hidden="true">|</span>'
+            f'<div class="nav-admin">{admin_items}</div>'
+            '</nav></header>')
 
 
 _STATUS_LABELS = {
@@ -138,6 +396,13 @@ def _text_field(name, label, value="", required=False, maxlen=None,
     return (f'<label class="field"><span class="field-label">{_e(label)}{mark}</span>'
             f'<input name="{_e(name)}" type="{type_}" value="{_e(value)}"{req}{maxa}{ph}/>'
             f'{helper_html}</label>')
+
+
+def _readonly_field(label, value, helper="") -> str:
+    helper_html = f'<span class="hint">{_e(helper)}</span>' if helper else ""
+    return ('<div class="field"><span class="field-label">' + _e(label) + '</span>'
+            + f'<p class="readonly-value">{_e(value or "")}</p>'
+            + helper_html + '</div>')
 
 
 def _textarea_field(name, label, value="", required=False, maxlen=None,
@@ -202,8 +467,9 @@ def dashboard(stats, recent_audit, message="") -> str:
     if not recent_rows:
         recent_rows = '<li class="empty">No recent activity.</li>'
     body = (
-        _navbar("dashboard")
-        + "<h1>Overview</h1>"
+        _navbar("status")
+        + "<h1>System Status</h1>"
+        + '<p class="section-hint">สถานะ Core, Library และดัชนีการค้นหา</p>'
         + _banner(message)
         + '<section class="card"><h2 class="metric-group-title">Memories</h2><div class="metric-grid">'
         + memories + "</div></section>"
@@ -389,7 +655,7 @@ def _memory_actions(memory, mid) -> str:
     )
 
 
-def memory_detail(memory, message="") -> str:
+def memory_detail(memory, message="", media=None) -> str:
     if not memory:
         return _page(_navbar("memories")
                      + '<div class="banner error" role="alert">This memory was not found.</div>'
@@ -404,12 +670,14 @@ def memory_detail(memory, message="") -> str:
             inner = _e(memory.get(key, ""))
         fields += f"<dt>{_e(label)}</dt><dd>{inner}</dd>"
     mid = _e(memory["memory_id"])
+    gallery = _media_section(media, "memory", memory["memory_id"], admin=True)
     body = (
         _navbar("memories")
         + "<h1>Memory</h1>"
         + _banner(message)
         + f'<p class="subtitle">{mid} {_status_badge(memory.get("status",""))}</p>'
         + f'<dl class="detail">{fields}</dl>'
+        + gallery
         + _memory_btn_row(memory, mid)
         + _memory_actions(memory, mid)
         + '<p><a class="btn btn-ghost" href="/portal/memories">Back to Memories</a></p>'
@@ -457,13 +725,24 @@ def memory_edit_form(memory, message="", error="") -> str:
     prefill = error if isinstance(error, dict) else {}
     err_text = error if isinstance(error, str) else ""
     mid = _e(memory["memory_id"])
+    is_section = bool(memory.get("collection_id"))
+    if is_section:
+        subject_block = _readonly_field(
+            "Subject", memory.get("subject", ""),
+            "Inherited from the Collection; cannot be changed.")
+        scope_block = _readonly_field(
+            "Scope", memory.get("scope", ""),
+            "Inherited from the Collection; cannot be changed.")
+    else:
+        subject_block = _text_field("subject", "Subject",
+                                    prefill.get("subject", memory.get("subject", "")), required=True, maxlen=500)
+        scope_block = _text_field("scope", "Scope",
+                                  prefill.get("scope", memory.get("scope", "household")), maxlen=100)
     fields = (
-        _text_field("subject", "Subject",
-                    prefill.get("subject", memory.get("subject", "")), required=True, maxlen=500)
+        subject_block
         + _text_field("memory_type", "Type",
                       prefill.get("memory_type", memory.get("memory_type", "fact")), maxlen=100)
-        + _text_field("scope", "Scope",
-                      prefill.get("scope", memory.get("scope", "household")), maxlen=100)
+        + scope_block
         + _text_field("title", "Title", prefill.get("title", memory.get("title", "")), maxlen=500)
         + _textarea_field("raw_content", "Content",
                           prefill.get("raw_content", memory.get("raw_content", "")),
@@ -565,7 +844,7 @@ def _issues_html(issues):
 def _assembled_preview(memories):
     if not memories:
         return ""
-    ordered = sorted(memories, key=lambda x: x.get("sequence_number", 0))
+    ordered = sorted(memories, key=lambda x: (x.get("sequence_number") is None, x.get("sequence_number") or 0))
     blocks = "".join(
         f'<article class="preview-block"><h3>{_e(m.get("title") or m.get("subject") or "")}</h3>'
         f'<pre>{_e(m.get("raw_content",""))}</pre></article>'
@@ -595,7 +874,12 @@ def _add_section_form(cid, current):
             + '<p class="hint">Each section becomes an independently editable memory in this collection.</p></section>')
 
 
-def collection_detail(collection, memories, validation, message="") -> str:
+def _reopen_banner() -> str:
+    return ('<div class="banner warning" role="status">'
+            'This Collection was reopened for editing. Validate it again, then Activate to republish.</div>')
+
+
+def collection_detail(collection, memories, validation, message="", reopened=False, media=None) -> str:
     if not collection:
         return _page(_navbar("collections")
                      + '<div class="banner error" role="alert">This collection was not found.</div>')
@@ -639,7 +923,8 @@ def collection_detail(collection, memories, validation, message="") -> str:
     if memories:
         rows = []
         for i, m in enumerate(memories):
-            mid = _e(m["memory_id"])
+            raw_mid = m["memory_id"]
+            mid = _e(raw_mid)
             label = _e(m.get("title") or m.get("subject") or "")
             seq = _e(m.get("sequence_number", ""))
             up_disabled = ' disabled' if i == 0 else ""
@@ -663,13 +948,19 @@ def collection_detail(collection, memories, validation, message="") -> str:
                     "onsubmit=\"return confirm('Forget this section? This cannot be undone.')\">"
                     f'<button type="submit" class="btn btn-xsmall btn-danger">Forget</button></form>'
                 )
-            rows.append(
+            main_row = (
                 f"<tr><td>{seq}</td>"
                 f"<td>{label} <span class=\"mono\">{mid}</span></td>"
                 f"<td>{_status_badge(m.get('status',''))}</td>"
                 f"<td>{_e(m.get('version',''))}</td>"
                 f'<td class="section-controls">{controls}</td></tr>'
             )
+            rows.append(main_row)
+            if "media" in m:
+                rows.append(
+                    f'<tr id="section-{_e(raw_mid)}" class="section-media-row">'
+                    f'<td colspan="5">{_section_media_manager(m, collection["collection_id"])}</td></tr>'
+                )
         sections_html = "".join(rows)
     else:
         sections_html = ('<tr><td colspan="5"><div class="empty-state">'
@@ -701,8 +992,10 @@ def collection_detail(collection, memories, validation, message="") -> str:
         _navbar("collections")
         + "<h1>Collection</h1>"
         + _banner(message)
+        + (_reopen_banner() if (reopened and collection.get("status") == "draft") else "")
         + f'<p class="subtitle">{cid} {_status_badge(collection.get("status",""))}</p>'
         + f'<dl class="detail">{fields}</dl>'
+        + _media_section(media, "collection", collection["collection_id"], admin=True)
         + '<div class="btn-row">'
         + f'<a class="btn" href="/portal/collections/{cid}/edit">Edit details</a>'
         + '<a class="btn btn-ghost" href="/portal/collections">All collections</a></div>'
@@ -863,6 +1156,506 @@ def error_page(message: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Search (user-facing)
+# ---------------------------------------------------------------------------
+
+def _research_nav_removed():
+    pass  # unified navigation is provided by _navbar
+
+
+def _technical_details(entry) -> str:
+    entity_id = entry.get("entity_id") or entry.get("memory_id") or entry.get("collection_id")
+    rows = [
+        ("ID", entity_id),
+        ("Score", entry.get("score")),
+        ("Match reasons", ", ".join(entry.get("match_reasons") or [])),
+        ("Freshness", entry.get("projection_freshness")),
+        ("Projected version", entry.get("projected_core_version") or entry.get("core_version")),
+        ("Checksum", entry.get("checksum")),
+    ]
+    inner = "".join(
+        f"<dt>{_e(label)}</dt><dd class=\"mono\">{_e(value)}</dd>"
+        for label, value in rows if value not in (None, "")
+    )
+    return ('<details class="technical"><summary>รายละเอียดทางเทคนิค</summary>'
+            f"<dl>{inner}</dl></details>")
+
+
+def _selected_sections(entry) -> str:
+    secs = entry.get("selected_sections") or []
+    if not secs:
+        return ""
+    items = "".join(
+        f'<li><a href="/portal/memories/{_e(s.get("memory_id"))}">'
+        f'{_e(s.get("title") or s.get("section_path") or s.get("memory_id"))}</a></li>'
+        for s in secs
+    )
+    return f'<ul class="selected-sections">{items}</ul>'
+
+
+_RESULT_LABELS = {
+    "memory": "บันทึกความรู้",
+    "collection": "ชุดความรู้",
+    "section": "บทภายในชุด",
+}
+
+
+def _empty_cover(seed_text="") -> str:
+    """Decorative 3:4 placeholder cover: drawn book mark + Thai label.
+
+    aria-hidden (purely decorative). Exposes no filesystem path or binary data.
+    The first non-space character of the title is shown subtly.
+    """
+    seed = (seed_text or "").strip()
+    initial = _e(seed[:1]) if seed else "?"
+    return ('<div class="lib-cover lib-cover-placeholder" aria-hidden="true">'
+            '<span class="lib-cover-glyph" aria-hidden="true">'
+            '<svg class="lib-cover-book" width="34" height="40" viewBox="0 0 34 40" focusable="false">'
+            '<rect x="4" y="4" width="26" height="32" rx="3" fill="none" '
+            'stroke="currentColor" stroke-width="1.5"/>'
+            '<line x1="11" y1="14" x2="11" y2="30" stroke="currentColor" stroke-width="1.5"/>'
+            '<line x1="16" y1="14" x2="16" y2="30" stroke="currentColor" stroke-width="1.5"/>'
+            '<line x1="21" y1="14" x2="21" y2="30" stroke="currentColor" stroke-width="1.5"/>'
+            '</svg></span>'
+            + f'<span class="lib-cover-initial">{initial}</span>'
+            + '<span class="lib-cover-none">ยังไม่มีภาพปก</span>'
+            + "</div>")
+
+
+def _card_cover(entry) -> str:
+    """Cover thumbnail (authenticated URL) or a 3:4 placeholder."""
+    thumb = entry.get("cover_thumb_url")
+    title = (entry.get("title") or entry.get("subject")
+             or entry.get("collection_title") or "")
+    alt = _e(entry.get("cover_alt") or title)
+    if thumb:
+        return ('<div class="lib-cover">'
+                + f'<img class="lib-cover-img" src="{_e(thumb)}" alt="{alt}" loading="lazy">'
+                + "</div>")
+    return _empty_cover(title)
+
+
+def _result_card(entry, kind) -> str:
+    kind_label = _RESULT_LABELS.get(kind, kind)
+    buttons = ""
+    count_html = ""
+    if kind == "section":
+        ctitle = entry.get("collection_title") or ""
+        title = (f'{_e(ctitle)} › {_e(entry.get("title") or entry.get("subject") or "")}'
+                 if ctitle else _e(entry.get("title") or entry.get("subject") or ""))
+        buttons = (
+            f'<a class="btn result-open" href="/portal/library/memories/{_e(entry.get("memory_id"))}">อ่านบทนี้</a>'
+            f'<a class="btn btn-ghost result-open" href="/portal/library/collections/{_e(entry.get("collection_id"))}">เปิดทั้งชุด</a>'
+        )
+    elif kind == "collection":
+        title = _e(entry.get("title") or entry.get("subject") or "")
+        n = len(entry.get("selected_sections") or [])
+        if n:
+            count_html = f'<p class="lib-chapter-count">จำนวนบท {_e(n)}</p>'
+        buttons = f'<a class="btn result-open" href="/portal/library/collections/{_e(entry.get("collection_id"))}">เปิดชุดความรู้</a>'
+    else:
+        title = _e(entry.get("title") or entry.get("subject") or "")
+        buttons = f'<a class="btn result-open" href="/portal/library/memories/{_e(entry.get("memory_id"))}">อ่านบันทึก</a>'
+    excerpt = _e(entry.get("excerpt") or "")
+    excerpt_html = f'<p class="result-excerpt lib-excerpt">{excerpt}</p>' if excerpt else ""
+    selected = (_selected_sections(entry)
+                if kind == "collection" and entry.get("selected_sections") else "")
+    status_html = _status_badge(entry.get("status")) if entry.get("status") else ""
+    return (
+        '<article class="lib-card">'
+        + _card_cover(entry)
+        + '<div class="lib-body">'
+        + f'<span class="result-kind">{_e(kind_label)}</span>'
+        + f'<h3 class="lib-title">{title}</h3>'
+        + status_html
+        + excerpt_html
+        + count_html
+        + selected
+        + _technical_details(entry)
+        + "</div>"
+        + f'<div class="lib-actions">{buttons}</div>'
+        + "</article>"
+    )
+
+
+def _result_group(label, items, kind) -> str:
+    cards = "".join(_result_card(it, kind) for it in items)
+    return ('<section class="result-group"><h2>' + _e(label) + "</h2>"
+            + f'<div class="result-list">{cards}</div></section>')
+
+
+def _no_results_html(q, suggestion) -> str:
+    return ('<div class="empty-state no-results">'
+            + f"<p>ไม่พบผลลัพธ์สำหรับ \u201c{_e(q)}\u201d.</p>"
+            + "<p>ลองพิมพ์คำอื่นหรือใช้คำค้นที่สั้นกว่า</p>"
+            + (f'<p class="hint">คำแนะนำ: {_e(suggestion)}</p>' if suggestion else "")
+            + "</div>")
+
+
+def search_page(q="", memories=None, collections=None, sections=None,
+                stale=False, error="", total=0, suggestion="") -> str:
+    memories = memories or []
+    collections = collections or []
+    sections = sections or []
+    nav = _navbar("library")
+    hero = (
+        '<section class="search-hero"><h1>ค้นหาในคลังความรู้</h1>'
+        '<p class="search-hint">พิมพ์คำหรือหัวข้อที่ต้องการค้นหา</p>'
+        '<form method="post" action="/portal/search" class="search-form">'
+        '<input type="hidden" name="target" value="auto"/>'
+        f'<input class="search-input" name="q" value="{_e(q)}" '
+        'placeholder="เช่น วิธีรดน้ำต้นไม้, การดูแลสวน" autofocus/>'
+        '<button type="submit" class="btn search-btn">ค้นหา</button>'
+        "</form>"
+        '<p class="search-target">ค้นหาทั้งบันทึกและชุดความรู้</p>'
+        "</section>"
+    )
+    stale_html = ('<div class="banner warning" role="status">'
+                  "ผลการค้นหาอาจล้าสมัย (ยังไม่ได้สร้างดัชนีใหม่) "
+                  "เปิดดูรายการเพื่อดูเวอร์ชันปัจจุบัน หรือขอให้ผู้ดูแลสร้างดัชนีใหม่"
+                  if stale else "")
+    error_html = f'<div class="banner error" role="alert">{_e(error)}</div>' if error else ""
+    if not q:
+        return _page(nav + hero + '<div class="empty-state"><p>พิมพ์คำค้นด้านบนเพื่อเริ่มค้นหา</p></div>')
+    if total == 0:
+        return _page(nav + hero + stale_html + error_html + _no_results_html(q, suggestion))
+    groups = ""
+    if memories:
+        groups += _result_group("บันทึกความรู้", memories, "memory")
+    if collections:
+        groups += _result_group("ชุดความรู้", collections, "collection")
+    if sections:
+        groups += _result_group("บทภายในชุด", sections, "section")
+    return _page(nav + hero + stale_html + error_html
+                 + f'<p class="count">พบ {_e(total)} รายการ</p>' + groups)
+
+
+# ---------------------------------------------------------------------------
+# Library Reader (read-only)
+# ---------------------------------------------------------------------------
+
+def _library_hero(q="") -> str:
+    return (
+        '<section class="search-hero"><h1>Search the knowledge library</h1>'
+        '<p class="search-hint">ค้นหาความรู้ที่บันทึกไว้ในบ้าน</p>'
+        '<form method="post" action="/portal/search" class="search-form">'
+        '<input type="hidden" name="target" value="auto"/>'
+        f'<input class="search-input" name="q" value="{_e(q)}" '
+        'placeholder="เช่น วิธีรดน้ำต้นไม้, การดูแลสวน" autofocus/>'
+        '<button type="submit" class="btn search-btn">ค้นหา</button>'
+        "</form>"
+        '<p class="search-target">ค้นหาทั้งบันทึกความรู้ ชุดความรู้ และบทภายในชุด</p>'
+        "</section>"
+    )
+
+
+def _cat_counts(cat) -> str:
+    # "\u0e0a\u0e38\u0e14" = collection count label, "\u0e1b\u0e31\u0e19\u0e17\u0e36\u0e01" = memory count label
+    return (f'{_e(cat.get("collections", 0))} \u0e0a\u0e38\u0e14 \xb7 '
+            f'{_e(cat.get("memories", 0))} \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01')
+
+
+def _category_card(cat) -> str:
+    key = _e(cat.get("key") or "")
+    name = _e(cat.get("name") or "")
+    hint = _e(cat.get("hint") or "")
+    counts = _cat_counts(cat)
+    cov = cat.get("cover")
+    if cov and cov.get("media_id"):
+        alt = _e(cov.get("alt_text") or cov.get("caption") or "")
+        cover = ('<div class="lib-cat-cover"><img class="lib-cat-cover-img" '
+                 f'src="{_media_thumb_url(cov["media_id"])}" alt="{alt}" loading="lazy"></div>')
+    else:
+        cover = _empty_cover(cat.get("name") or "")
+    return (
+        f'<a class="lib-cat" href="/portal/library/subjects/{key}">'
+        + cover
+        + '<div class="lib-cat-body">'
+        + f'<span class="lib-cat-name">{name}</span>'
+        + f'<span class="lib-cat-hint">{hint}</span>'
+        + f'<span class="lib-cat-counts">{counts}</span>'
+        + "</div></a>"
+    )
+
+
+
+
+def _category_section(categories) -> str:
+    cards = "".join(_category_card(c) for c in categories)
+    return ('<section class="lib-section"><h2>Browse by Subject</h2>'
+            '<p class="section-hint">เรียกดูตามหมวดหมู่ของหัวข้อ</p>'
+            f'<div class="lib-cat-grid">{cards}</div></section>')
+
+
+def _entity_cover(entity) -> str:
+    cov = entity.get("cover")
+    if cov and cov.get("media_id"):
+        alt = _e(cov.get("alt_text") or cov.get("caption") or "")
+        return ('<div class="lib-cover"><img class="lib-cover-img" '
+                f'src="{_media_thumb_url(cov["media_id"])}" alt="{alt}"></div>')
+    title = entity.get("title") or entity.get("subject") or ""
+    initial = _e(title[:1]) if title else "?"
+    return ('<div class="lib-cover lib-cover-placeholder" aria-hidden="true">'
+            f'<span class="lib-cover-initial">{initial}</span>'
+            '<span class="lib-cover-none">ยังไม่มีภาพปก</span></div>')
+
+
+def library_card(entity, entity_type) -> str:
+    """Cover-first library card. entity_type in ('memory','collection')."""
+    if entity_type == "collection":
+        label = "ชุดความรู้"
+        title = entity.get("title") or entity.get("subject") or ""
+        excerpt = (entity.get("summary") or "")[:160]
+        link = f"/portal/library/collections/{_e(entity.get('collection_id'))}"
+        button = "เปิดชุดความรู้"
+    else:
+        label = "บันทึกความรู้"
+        title = entity.get("title") or entity.get("subject") or ""
+        excerpt = (entity.get("raw_content") or "")[:160]
+        link = f"/portal/library/memories/{_e(entity.get('memory_id'))}"
+        button = "อ่านบันทึก"
+    cat_name = _e(_category_for_subject(entity.get("subject")).get("name") or "")
+    return (
+        '<article class="lib-card">'
+        + _entity_cover(entity)
+        + '<div class="lib-body">'
+        + f'<span class="result-kind">{_e(label)}</span>'
+        + f'<h3 class="lib-title">{_e(title)}</h3>'
+        + f'<span class="lib-subject">{cat_name}</span>'
+        + (f'<p class="result-excerpt lib-excerpt">{_e(excerpt)}</p>' if excerpt else "")
+        + "</div>"
+        + f'<div class="lib-actions"><a class="btn" href="{link}">{_e(button)}</a></div>'
+        + "</article>"
+    )
+
+
+def _discover_section(entities) -> str:
+    grid = "".join(library_card(e, e.get("_type", "memory")) for e in entities)
+    if not grid:
+        grid = '<div class="empty-state"><p class="section-hint">ลองเปิดดู</p></div>'
+    return ('<section class="lib-section"><h2>Discover</h2>'
+            '<p class="section-hint">ลองเปิดดู</p>'
+            f'<div class="lib-card-grid">{grid}</div></section>')
+
+
+def _recent_section(entities) -> str:
+    grid = "".join(library_card(e, e.get("_type", "memory")) for e in entities)
+    if not grid:
+        grid = '<div class="empty-state"><p class="section-hint">รายการที่อัปเดตล่าสุด</p></div>'
+    return ('<section class="lib-section"><h2>Recently Updated</h2>'
+            '<p class="section-hint">รายการที่อัปเดตล่าสุด</p>'
+            f'<div class="lib-card-grid">{grid}</div></section>')
+
+
+def library_home(categories, discover, recent, q="") -> str:
+    nav = _navbar("library")
+    body = (nav + _library_hero(q) + _category_section(categories)
+            + _discover_section(discover) + _recent_section(recent))
+    return _page(body)
+
+
+def _pager(offset, page_size, total, base_url) -> str:
+    if total <= page_size:
+        return ""
+    prev = (f'<a class="btn btn-xsmall btn-ghost" href="{_e(base_url)}&offset={offset - page_size}">'
+            "&larr; ก่อนหน้า</a>") if offset > 0 else ""
+    nxt = (f'<a class="btn btn-xsmall btn-ghost" href="{_e(base_url)}&offset={offset + page_size}">'
+           "ถัดไป &rarr;</a>") if offset + page_size < total else ""
+    return (f'<nav class="pager" aria-label="Pagination"><span>หน้า {_e((offset // page_size) + 1)}</span>'
+            f"{prev}{nxt}</nav>")
+
+
+def category_page(category, collections, memories, offset=0, total=0, page_size=20) -> str:
+    nav = _navbar("library")
+    name = _e(category.get("name") or "")
+    hint = _e(category.get("hint") or "")
+    breadcrumb = f'<p class="breadcrumb"><a href="/portal/">Library</a> › <span>{name}</span></p>'
+    blocks = ""
+    if collections:
+        blocks += ('<h3 class="lib-cat-sub">ชุดความรู้</h3><div class="lib-card-grid">'
+                   + "".join(library_card(c, "collection") for c in collections) + "</div>")
+    if memories:
+        blocks += ('<h3 class="lib-cat-sub">บันทึกความรู้</h3><div class="lib-card-grid">'
+                   + "".join(library_card(m, "memory") for m in memories) + "</div>")
+    if not blocks:
+        blocks = '<div class="empty-state"><p>ยังไม่มีรายการในหมวดนี้</p></div>'
+    url = f"/portal/library/subjects/{_e(category.get('key'))}?offset=0"
+    body = (nav + breadcrumb + f"<h1>{name}</h1>"
+            + f'<p class="section-hint">{hint}</p>'
+            + blocks + _pager(offset, page_size, total, url))
+    return _page(body)
+
+
+def library_memory(memory, back="/portal/search", collection_title="", media=None) -> str:
+    nav = _navbar("library")
+    mid = memory["memory_id"]
+    heading = memory.get("title") or memory.get("subject") or "Memory"
+    status_html = _status_badge(memory.get("status", ""))
+    cat = _category_for_subject(memory.get("subject"))
+    cat_name = cat.get("name") or ""
+
+    meta = ""
+    for label, value, href in (
+        ("Subject", memory.get("subject") or "", ""),
+        ("Category", cat_name, ""),
+        ("Type", memory.get("memory_type") or "", ""),
+        ("Status", memory.get("status") or "", ""),
+        ("Language", memory.get("language") or "", ""),
+    ):
+        if not value:
+            continue
+        if href:
+            meta += ('<li class="reader-meta-item"><span class="reader-meta-k">'
+                     + _e(label) + '</span><span class="reader-meta-v"><a href="'
+                     + _e(href) + '">' + _e(value) + "</a></span></li>")
+        else:
+            meta += ('<li class="reader-meta-item"><span class="reader-meta-k">'
+                     + _e(label) + '</span><span class="reader-meta-v">'
+                     + _e(value) + "</span></li>")
+    if collection_title and memory.get("collection_id"):
+        parent_url = f"/portal/library/collections/{_e(memory.get('collection_id'))}"
+        meta += ('<li class="reader-meta-item"><span class="reader-meta-k">Collection</span>'
+                 f'<span class="reader-meta-v"><a href="{_e(parent_url)}">{_e(collection_title)}</a></span></li>')
+    meta_html = f'<ul class="reader-meta">{meta}</ul>' if meta else ""
+
+    cover_vm = build_cover_vm(media)
+    if cover_vm:
+        hero_cover = ('<div class="reader-hero-cover"><img class="reader-cover" '
+                      f'src="{_media_thumb_url(cover_vm["media_id"])}" alt="{_e(cover_vm.get("alt") or "")}"></div>')
+    else:
+        hero_cover = _empty_cover(heading)
+    gallery = _media_section(media) if media else ""
+    tech = (
+        '<details class="technical"><summary>Technical details</summary>'
+        f"<dl><dt>ID</dt><dd class='mono'>{_e(mid)}</dd>"
+        f"<dt>Status</dt><dd>{_e(memory.get('status'))}</dd>"
+        f"<dt>Version</dt><dd>{_e(memory.get('version'))}</dd>"
+        f"<dt>Checksum</dt><dd class='mono'>{_e(memory.get('content_checksum'))}</dd></dl></details>"
+    )
+    edit_btn = f'<a class="btn btn-xsmall btn-ghost" href="/portal/memories/{_e(mid)}/edit">Edit</a>'
+    back_btn = f'<a class="btn btn-ghost" href="{_e(back)}">Back to results</a>'
+    body = (
+        nav
+        + '<div class="reader-hero">' + hero_cover
+        + '<div class="reader-hero-body">'
+        + f'<h1>{_e(heading)}</h1>' + status_html
+        + meta_html
+        + "</div></div>"
+        + ('<section class="card reader-content"><h2 class="visually-hidden">Content</h2>'
+           f'<pre class="reader-text">{_e(memory.get("raw_content", ""))}</pre></section>')
+        + gallery
+        + tech
+        + f'<div class="btn-row reader-actions">{back_btn}{edit_btn}</div>'
+    )
+    return _page(body)
+
+
+def _reader_chapter(sec, index) -> str:
+    """Read-only chapter block: number, title, cover, ordered illustration gallery."""
+    mid = sec.get("memory_id")
+    title = sec.get("title") or sec.get("subject") or f"Chapter {index}"
+    reader_link = f"/portal/library/memories/{_e(mid)}"
+    media = sec.get("media") or []
+    cover = next((m for m in media if m.get("is_cover")), (media[0] if media else None))
+    parts = []
+    if cover:
+        parts.append('<div class="chapter-cover-wrap"><img class="chapter-cover" src="'
+                     + _media_thumb_url(cover["media_id"])
+                     + '" alt="' + _e(cover.get("alt_text") or "") + '"></div>')
+    figs = []
+    for m in media:
+        alt = _e(m.get("alt_text") or "")
+        fig = ('<figure class="reader-figure"><img src="' + _media_thumb_url(m["media_id"])
+               + '" alt="' + alt + '" loading="lazy">')
+        if m.get("caption"):
+            fig += '<figcaption>' + _e(m.get("caption")) + "</figcaption>"
+        fig += "</figure>"
+        figs.append(fig)
+    if figs:
+        parts.append('<div class="chapter-gallery" aria-label="Section images">'
+                     + "".join(figs) + "</div>")
+    parts.append('<div class="chapter-text"><pre>' + _e(sec.get("raw_content", "")) + "</pre></div>")
+    parts.append('<p class="back-to-contents"><a href="#chapters">Back to contents</a></p>')
+    return ('<article class="chapter" id="chapter-' + _e(str(index)) + '">'
+            + f'<h3><span class="chapter-number">{index}.</span> <a href="{reader_link}">{_e(title)}</a></h3>'
+            + "".join(parts) + "</article>")
+
+
+def library_collection(collection, sections, back="/portal/search", media=None) -> str:
+    nav = _navbar("library")
+    cid = collection["collection_id"]
+    title = collection.get("title") or collection.get("subject") or "Collection"
+    status_html = _status_badge(collection.get("status", ""))
+    sections = list(sections or [])
+    ordered = sorted(sections, key=lambda s: s.get("sequence_number") or 0)
+
+    # Table of contents: ordered chapter anchors + small thumbnails.
+    toc_items = []
+    for i, sec in enumerate(ordered, start=1):
+        stitle = sec.get("title") or sec.get("subject") or f"Chapter {i}"
+        thumb = ""
+        smedia = sec.get("media") or []
+        scover = next((m for m in smedia if m.get("is_cover")), (smedia[0] if smedia else None))
+        if scover:
+            thumb = ('<img class="toc-thumb" src="' + _media_thumb_url(scover["media_id"])
+                     + '" alt="" loading="lazy">')
+        toc_items.append(
+            f'<li class="toc-item"><a href="#chapter-{i}">{thumb}'
+            f'<span class="toc-number">{i}.</span> {_e(stitle)}</a></li>')
+    toc_html = ('<ol class="toc">' + "".join(toc_items) + "</ol>") if toc_items else ""
+    chapters = "".join(_reader_chapter(sec, i) for i, sec in enumerate(ordered, start=1))
+    if not ordered:
+        chapters = '<div class="empty-state"><p>No chapters yet.</p></div>'
+
+    # Hero: 3:4 cover, title, summary, type/status/language/chapter count, actions.
+    cover_vm = build_cover_vm(media)
+    if cover_vm:
+        hero_cover = ('<div class="reader-hero-cover"><img class="reader-cover" '
+                      f'src="{_media_thumb_url(cover_vm["media_id"])}" alt="{_e(cover_vm.get("alt") or "")}"></div>')
+    else:
+        hero_cover = _empty_cover(title)
+    summary_html = (f'<p class="reader-summary">{_e(collection.get("summary") or "")}</p>'
+                    if collection.get("summary") else "")
+    meta = (
+        '<ul class="reader-meta">'
+        f'<li class="reader-meta-item"><span class="reader-meta-k">Subject</span><span class="reader-meta-v">{_e(collection.get("subject"))}</span></li>'
+        f'<li class="reader-meta-item"><span class="reader-meta-k">Type</span><span class="reader-meta-v">{_e(collection.get("collection_type") or "")}</span></li>'
+        f'<li class="reader-meta-item"><span class="reader-meta-k">Status</span><span class="reader-meta-v">{_e(collection.get("status"))}</span></li>'
+        f'<li class="reader-meta-item"><span class="reader-meta-k">Language</span><span class="reader-meta-v">{_e(collection.get("language") or "")}</span></li>'
+        f'<li class="reader-meta-item"><span class="reader-meta-k">Chapters</span><span class="reader-meta-v">{len(ordered)}</span></li>'
+        '</ul>'
+    )
+    actions = (
+        '<div class="reader-actions">'
+        + (f'<a class="btn" href="#chapter-1">เริ่มอ่าน</a>' if ordered else "")
+        + '<a class="btn btn-ghost" href="#chapters">Contents</a>'
+        + f'<a class="btn btn-ghost" href="{_e(back)}">Back to results</a>'
+        + "</div>"
+    )
+    tech = (
+        '<details class="technical"><summary>Technical details</summary>'
+        f"<dl><dt>ID</dt><dd class='mono'>{_e(cid)}</dd>"
+        f"<dt>Status</dt><dd>{_e(collection.get('status'))}</dd>"
+        f"<dt>Version</dt><dd>{_e(collection.get('version'))}</dd>"
+        f"<dt>Checksum</dt><dd class='mono'>{_e(collection.get('content_checksum'))}</dd></dl></details>"
+    )
+    edit_btn = f'<a class="btn btn-xsmall btn-ghost" href="/portal/collections/{_e(cid)}/edit">Edit</a>'
+    body = (
+        nav
+        + '<div class="reader-hero">' + hero_cover
+        + '<div class="reader-hero-body">'
+        + f'<h1>{_e(title)}</h1>' + status_html + summary_html + meta + actions
+        + "</div></div>"
+        + ('<section class="reader-toc" id="chapters" aria-label="Table of contents">'
+           '<h2>Chapters</h2>' + toc_html + "</section>")
+        + f'<section class="reader-content"><h2 class="visually-hidden">Chapters</h2>{chapters}</section>'
+        + tech
+        + f'<div class="btn-row reader-actions">{edit_btn}</div>'
+    )
+    return _page(body)
+
+
+# ---------------------------------------------------------------------------
 # Administration
 # ---------------------------------------------------------------------------
 
@@ -930,7 +1723,63 @@ def _purged_table(stats) -> str:
             + f"<tbody>{rows}</tbody></table></div>")
 
 
-def admin_page(stats, message="") -> str:
+def _resolver_controls(resolver) -> str:
+    if not resolver:
+        return ""
+    readiness = resolver.get("readiness") or {}
+    state = readiness.get("status", "not_ready")
+    ready_badge = ('<span class="badge active">ready</span>' if state == "ok"
+                   else '<span class="badge draft">not ready</span>')
+    fs = resolver.get("freshness_summary") or {}
+    counts = resolver.get("counts") or {}
+    last_build = resolver.get("last_full_build_id") or "-"
+    projected_at = resolver.get("projected_at") or "-"
+    checksum = resolver.get("snapshot_checksum") or ""
+    checksum_short = checksum[:12] if checksum else "-"
+    rows = (
+        f"<li>Status: {ready_badge} ({_e(state)})</li>"
+        f'<li>Fresh: {_e(fs.get("fresh",0))} &middot; Stale: {_e(fs.get("stale",0))} &middot; '
+        f'Missing: {_e(fs.get("missing",0))} &middot; Orphaned: {_e(fs.get("orphaned",0))}</li>'
+        f'<li>Projection: collections {_e(counts.get("collections",0))} &middot; '
+        f'memories {_e(counts.get("memories",0))} &middot; sections {_e(counts.get("sections",0))}</li>'
+        f"<li>Last rebuild: {_e(projected_at)}</li>"
+        f'<li>Active build ID: <span class="mono">{_e(last_build)}</span></li>'
+        f'<li>Snapshot checksum: <span class="mono">{_e(checksum_short)}</span></li>'
+    )
+    guidance = (
+        '<h3>Guidance</h3><ul class="issue-list">'
+        "<li>Changed one record - use Selective Rebuild (specify entity type + ID)</li>"
+        "<li>Changed several records or you are not sure - use Full Rebuild</li>"
+        "<li>The index is not refreshed automatically after Core edits - rebuild it manually</li>"
+        "</ul>"
+    )
+    full_form = (
+        '<form method="post" action="/portal/admin/resolver/rebuild">'
+        '<label class="field"><span class="field-label">Type REBUILD to confirm</span>'
+        '<input name="confirmation" placeholder="REBUILD" required/></label>'
+        '<button type="submit" class="btn">Full Rebuild</button></form>'
+    )
+    sel_form = (
+        '<form method="post" action="/portal/admin/resolver/rebuild/selective">'
+        '<label class="field"><span class="field-label">Entity type</span>'
+        '<input name="entity_type" placeholder="memory or collection" required/></label>'
+        '<label class="field"><span class="field-label">Entity ID</span>'
+        '<input name="entity_id" placeholder="entity ID" required/></label>'
+        '<label class="field"><span class="field-label">Type REBUILD to confirm</span>'
+        '<input name="confirmation" placeholder="REBUILD" required/></label>'
+        '<button type="submit" class="btn">Selective Rebuild</button></form>'
+    )
+    debug_link = '<a class="btn btn-ghost" href="/portal/resolver/">Open Resolver Debug</a>'
+    return (
+        '<section class="card"><h2>Search index (Resolver)</h2>'
+        + f'<ul class="audit-mini">{rows}</ul>'
+        + guidance
+        + '<div class="btn-row">' + full_form + sel_form + debug_link + "</div>"
+        + "</section>"
+    )
+
+
+def admin_page(stats, message="", resolver=None) -> str:
     forgotten_memories = stats.get("forgotten_memories", [])
     forgotten_collections = stats.get("forgotten_collections", [])
     all_forgotten = forgotten_memories + forgotten_collections
@@ -958,6 +1807,7 @@ def admin_page(stats, message="") -> str:
         + '<div class="stat-grid">' + cards + "</div>"
         + f'<p class="count">Forgotten memories: {_e(len(forgotten_memories))} &middot; Forgotten collections: {_e(len(forgotten_collections))} &middot; Ready to purge: {_e(len(ready))} &middot; Pending retention: {_e(len(pending))}</p>'
         + audit_stats_html
+        + _resolver_controls(resolver)
         + '<section class="card"><h2>Forgotten memories</h2>' + _forgotten_table(forgotten_memories) + "</section>"
         + '<section class="card"><h2>Forgotten collections</h2>' + _forgotten_table(forgotten_collections) + "</section>"
         + '<section class="card"><h2>Ready to purge</h2>' + _forgotten_table(ready) + "</section>"

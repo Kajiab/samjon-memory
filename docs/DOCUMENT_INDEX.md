@@ -36,6 +36,8 @@ This is the documentation entry point and authority map for Samjon Memory.
 | docs/core/api-contract.md | CANONICAL | API contract |
 | docs/core/migration-policy.md | CANONICAL | Migration policy |
 | docs/core/backup-restore.md | CANONICAL | Backup and restore |
+| docs/core/media-foundation.md | CANONICAL | Media (images) foundation |
+| docs/core/subject-type-guidelines.md | CANONICAL | Documents guidelines |
 | docs/api/error-contract.md | CANONICAL | Error contract |
 | docs/api/openapi.json | CANONICAL | OpenAPI specification |
 | docs/security/privacy-policy.md | CANONICAL | Privacy policy |
@@ -49,6 +51,7 @@ This is the documentation entry point and authority map for Samjon Memory.
 | docs/resolver/schema-and-migrations.md | PLANNED | Resolver schema and migration plan |
 | docs/resolver/search-ranking-and-freshness.md | PLANNED | Resolver search, ranking, and freshness |
 | docs/resolver/rebuild-and-test-plan.md | PLANNED | Resolver rebuild and test plan |
+| docs/resolver/RESOLVER_V1_FREEZE_EVALUATION.md | PASS | Resolver V1 freeze gate evidence |
 
 ## 4. Documentation Structure
 
@@ -66,6 +69,7 @@ docs/
 │   ├── memory-lifecycle.md
 │   ├── api-contract.md
 │   ├── migration-policy.md
+│   ├── media-foundation.md
 │   └── backup-restore.md
 ├── api/
 │   ├── error-contract.md
@@ -85,7 +89,8 @@ docs/
 │   ├── RESOLVER_V1_SPEC.md
 │   ├── schema-and-migrations.md
 │   ├── search-ranking-and-freshness.md
-│   └── rebuild-and-test-plan.md
+│   ├── rebuild-and-test-plan.md
+│   └── RESOLVER_V1_FREEZE_EVALUATION.md
 ├── adr/
 └── archive/
 ```
@@ -94,9 +99,6 @@ docs/
 
 All tasks:
 ```text
-HomeAI/AGENTS.md
-HomeAI/docs/DOCUMENT_INDEX.md
-HomeAI/docs/PROJECT_STATUS.md
 samjon-memory/AGENTS.md
 samjon-memory/docs/DOCUMENT_INDEX.md
 samjon-memory/docs/SAMJON_MEMORY_STATUS.md
@@ -130,7 +132,8 @@ samjon-memory/docs/SAMJON_MEMORY_STATUS.md
 | Resolver projection freshness + allow_stale | PROVEN | Foundation C1 freshness tests |
 | Resolver selective rebuild + expansion refresh | PROVEN | Foundation C2 selective tests |
 | Resolver bounded context expansion | PROVEN | Foundation C2 context tests |
-| Resolver Portal | NOT STARTED | Resolver Portal (separate foundation) |
+| Resolver Portal | PROVEN | Foundation D portal tests |
+| Resolver V1 freeze evaluation | PASS | docs/resolver/RESOLVER_V1_FREEZE_EVALUATION.md |
 | Semantic search | NOT STARTED | Deferred |
 | AI enrichment | NOT STARTED | Deferred |
 | Embeddings/vector search | NOT STARTED | ADR required |

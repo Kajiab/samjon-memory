@@ -2245,6 +2245,343 @@
         ]
       }
     },
+    "/portal/search": {
+      "get": {
+        "summary": "Portal Search",
+        "operationId": "portal_search_portal_search_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Portal Search Post",
+        "operationId": "portal_search_post_portal_search_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/library/memories/{memory_id}": {
+      "get": {
+        "summary": "Portal Library Memory",
+        "operationId": "portal_library_memory_portal_library_memories__memory_id__get",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/library/collections/{collection_id}": {
+      "get": {
+        "summary": "Portal Library Collection",
+        "operationId": "portal_library_collection_portal_library_collections__collection_id__get",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portal/admin/resolver/rebuild": {
+      "post": {
+        "summary": "Portal Admin Resolver Rebuild",
+        "operationId": "portal_admin_resolver_rebuild_portal_admin_resolver_rebuild_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/admin/resolver/rebuild/selective": {
+      "post": {
+        "summary": "Portal Admin Resolver Rebuild Selective",
+        "operationId": "portal_admin_resolver_rebuild_selective_portal_admin_resolver_rebuild_selective_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/resolver/": {
+      "get": {
+        "summary": "Resolver Portal Dashboard",
+        "operationId": "resolver_portal_dashboard_portal_resolver__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/resolver/query": {
+      "get": {
+        "summary": "Resolver Portal Query",
+        "operationId": "resolver_portal_query_portal_resolver_query_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/resolver/projection": {
+      "get": {
+        "summary": "Resolver Portal Projection",
+        "operationId": "resolver_portal_projection_portal_resolver_projection_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/resolver/rebuild": {
+      "get": {
+        "summary": "Resolver Portal Rebuild",
+        "operationId": "resolver_portal_rebuild_portal_resolver_rebuild_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Resolver Portal Rebuild Post",
+        "operationId": "resolver_portal_rebuild_post_portal_resolver_rebuild_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/resolver/evidence": {
+      "get": {
+        "summary": "Resolver Portal Evidence",
+        "operationId": "resolver_portal_evidence_portal_resolver_evidence_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/portal/resolver/rebuild/selective": {
+      "post": {
+        "summary": "Resolver Portal Rebuild Selective Post",
+        "operationId": "resolver_portal_rebuild_selective_post_portal_resolver_rebuild_selective_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
     "/resolver/ready": {
       "get": {
         "summary": "Resolver Ready",

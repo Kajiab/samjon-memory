@@ -20,7 +20,7 @@
 - Dashboard metrics: Implemented
 - Audit summary, filters, pagination: Implemented
 - Manual Portal verification: PASS
-- Resolver: Foundation C2 (schema 1.1.0, selective rebuild + bounded context)
+- Resolver: Foundation D delivered (schema 1.1.0, Resolver Debug Portal)
 - MCP readiness: Not ready
 
 ## Core Baseline
@@ -72,7 +72,7 @@ Required configuration:
 
 ## Resolver
 
-- Status: Foundation C2 delivered (selective rebuild, bounded context); Resolver Portal not implemented
+- Status: Foundation D delivered (Resolver Debug Portal); Resolver V1 Freeze Evaluation: ALL GATES PASS -> READY_FOR_OWNER_APPROVAL
 - Resolver database (samjon_resolver.sqlite): created, schema 1.1.0
 - FTS5 availability check: Implemented (fail-fast RESOLVER_DATABASE_UNAVAILABLE)
 - Resolver migrations: Implemented and idempotent
@@ -107,7 +107,13 @@ Required configuration:
 - `context_budget` + neighbor count enforced; truncation reported explicitly: PROVEN
 - Selective rebuild API `POST /api/v1/resolver/rebuild/selective` (admin token)
 - Query fields `neighbor_items` + `context_budget`; evidence includes selected Section IDs, sequence numbers, budget used, truncated flag, inclusion reason
-- Not implemented: Resolver Portal, embeddings, vector search, AI enrichment, MCP
+- Resolver Debug Portal under /portal/resolver/: Implemented (Dashboard, Query Debug, Projection Status, Rebuild Controls, Evidence Viewer)
+- Portal reuses existing Portal HTTP Basic auth + exact Origin validation; server-rendered only; no duplicate SPA
+- Portal handlers call ResolverService / CoreService only; never open SQLite or repositories directly; no Core writes
+- Rebuild controls require explicit `rebuild` confirmation; Cancel is a no-side-effect navigation link
+- Acceptance dataset (synthetic) + acceptance tests: Thai/English search, aliases, vocabulary, collections/sections, ambiguous/no-match, stale/allow_stale
+- Resolver V1 Freeze Evaluation: ALL GATES PASS (see `docs/resolver/RESOLVER_V1_FREEZE_EVALUATION.md`)
+- Not implemented / out of scope: embeddings, vector search, AI enrichment, MCP, Numchoke integration
 - Semantic search: Not implemented
 - AI enrichment: Not implemented
 - Embeddings: Not implemented
@@ -118,7 +124,7 @@ Required configuration:
 All tests pass with executable evidence:
 
 - Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 257
+- Passed: 273
 - Failed: 0
 - Skipped: 0
 - Verified: 2026-09-20

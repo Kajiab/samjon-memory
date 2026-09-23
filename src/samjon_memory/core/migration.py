@@ -157,9 +157,36 @@ UPDATE memory_collection SET forgotten_at=(
 ) WHERE status='forgotten' AND forgotten_at IS NULL;
 """
 
+_MEDIA_SQL = """
+CREATE TABLE IF NOT EXISTS media (
+    media_id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL CHECK(entity_type IN ('memory','collection')),
+    entity_id TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    thumbnail_path TEXT,
+    mime_type TEXT NOT NULL CHECK(mime_type IN ('image/jpeg','image/png','image/webp')),
+    file_size INTEGER NOT NULL CHECK(file_size >= 0),
+    width INTEGER NOT NULL CHECK(width > 0),
+    height INTEGER NOT NULL CHECK(height > 0),
+    alt_text TEXT,
+    caption TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    is_cover INTEGER NOT NULL DEFAULT 0 CHECK(is_cover IN (0,1)),
+    checksum TEXT NOT NULL,
+    lifecycle_status TEXT NOT NULL DEFAULT 'active'
+        CHECK(lifecycle_status IN ('active','hidden','purged')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_media_entity ON media(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_media_entity_cover ON media(entity_type, entity_id, is_cover);
+CREATE INDEX IF NOT EXISTS idx_media_display ON media(display_order);
+"""
+
 _MIGRATIONS = {
     "1.0.0": [_SCHEMA_SQL, _DURABLE_SQL, _IDEMPOTENCY_SQL, _AUDIT_SQL, _INDEX_SQL],
     "1.1.0": [_V110_SQL],
+    "1.2.0": [_MEDIA_SQL],
 }
 
 

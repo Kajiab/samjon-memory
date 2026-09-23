@@ -86,7 +86,7 @@ class MemoryRepo:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
-    def create(self, data: dict) -> dict:
+    def create(self, data: dict, commit: bool = True) -> dict:
         mid = data["memory_id"]
         self.conn.execute(
             """INSERT INTO memory
@@ -104,7 +104,8 @@ class MemoryRepo:
              1, data.get("supersedes_memory_id"), data.get("content_checksum"),
              utc_now(), utc_now()),
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
         return self.get(mid)
 
     def get(self, memory_id: str) -> Optional[dict]:

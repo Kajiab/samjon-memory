@@ -90,7 +90,7 @@ def test_dashboard_metric_links(client, temp_db):
     svc = CoreService(database_path=temp_db)
     app.state.service = svc
     _seed(svc)
-    body = client.get("/portal/").text
+    body = client.get("/portal/status").text
     assert 'href="/portal/memories?scope=standalone"' in body
     assert 'href="/portal/memories?scope=standalone&amp;status=draft"' in body
     assert 'href="/portal/memories?scope=standalone&amp;status=active"' in body

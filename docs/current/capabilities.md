@@ -44,10 +44,11 @@ Proven capabilities for Samjon Memory Core V1.
 | Resolver freshness + allow_stale | PROVEN | fresh/stale/missing/orphaned from Core version+checksum; allow_stale |
 | Resolver selective rebuild + expansion refresh | PROVEN | memory/collection selective; inactive/orphaned cleanup; fallback to full |
 | Resolver bounded context expansion | PROVEN | neighbors ordered by sequence, active-only, no cross-Collection, budget+truncation |
+| Resolver Debug Portal | PROVEN | /portal/resolver/ server-rendered; HTTP Basic + exact Origin; evidence viewer; guarded rebuild |
 | OpenAPI | PROVEN | drift test |
 
 ## 3. Limitations
 
 - Resolver search/ranking/freshness: Implemented (Foundation C1)
-- No Resolver Portal (separate foundation)
-- No semantic search / embeddings / vector search / AI enrichment / MCP
+- Resolver Debug Portal: Implemented (Foundation D)
+- No semantic search / embeddings / vector search / AI enrichment / MCP / Numchoke

@@ -53,7 +53,30 @@ def _doc_normalized(doc, core):
     ]
     parts.extend(_aliases_for(core, doc.get("subject")))
     parts.extend(_tags_for(core, doc.get("subject")))
+    parts.append(_media_text_for(core, doc))
     return " ".join(part for part in parts if part)
+
+
+def _media_text_for(core, doc):
+    """Searchable media alt/caption text for a document's entity.
+
+    Only validated alt-text and captions are indexed; never file paths or
+    binary data. Memory projections use entity_type 'memory' + the memory id;
+    collection projections use 'collection' + the collection id.
+    """
+    if doc.get("entity_type") == ENTITY_COLLECTION:
+        media_type, entity_id = "collection", doc.get("entity_id")
+    else:
+        media_type, entity_id = "memory", doc.get("entity_id")
+    parts = []
+    for m in core.get("media", []):
+        if m.get("entity_type") != media_type or m.get("entity_id") != entity_id:
+            continue
+        for field in ("alt_text", "caption"):
+            value = normalize_text(m.get(field))
+            if value:
+                parts.append(value)
+    return " ".join(parts)
 
 
 def _match_scope_key(entity_type):

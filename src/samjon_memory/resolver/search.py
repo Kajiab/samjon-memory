@@ -3,20 +3,33 @@
 Search is pure and deterministic over the projection and FTS5 index: no
 randomness, no AI, no recency boost, no embeddings. Freshness is computed
 from the current Core version/checksum, never from a stored label.
+
+Matching tiers (by score, high to low): exact-title, exact-content,
+title-prefix, title-infix, content-prefix, content-infix. A FTS5 prefix term
+``"tok"*`` (code-added) covers exact and prefix tokens; a bounded Thai-only
+substring fallback over the normalized snapshot covers infix hits in unspaced
+Thai tokens. Raw user input never reaches MATCH.
 """
 
 from samjon_memory.errors import ProjectionStale, ValidationError
 from samjon_memory.resolver.constants import (
     AMBIGUOUS_EPSILON,
     BOOST_ALIAS,
+    BOOST_EXACT_CONTENT,
     BOOST_EXACT_SUBJECT,
+    BOOST_EXACT_TITLE,
+    BOOST_CONTENT_PREFIX,
+    BOOST_CONTENT_SUBSTRING,
     BOOST_SUBJECT_TERM,
     BOOST_TAG,
     BOOST_TITLE,
+    BOOST_TITLE_PREFIX,
+    BOOST_TITLE_SUBSTRING,
     BOOST_VOCAB,
     DEFAULT_QUERY_LIMIT,
     MAX_NEIGHBORS,
     MAX_QUERY_LIMIT,
+    MIN_PREFIX_LENGTH,
     RESULT_AMBIGUOUS,
     RESULT_COLLECTION,
     RESULT_COLLECTION_MEMORY,
@@ -40,9 +53,47 @@ def _bounded(value, minimum, maximum):
         return minimum
 
 
+_THAI_RANGE_START = "\u0e00"
+_THAI_RANGE_END = "\u0e7f"
+
+
+def _is_thai_token(token):
+    """True when a normalized token contains any Thai character.
+
+    Thai is a partly-spaced script: FTS5/unicode61 sees a whole unspaced run as
+    one token (``แมวไทย`` -> one token), so a shorter term such as ``แมว`` is
+    neither an exact token nor (when it appears mid-token) a prefix of it. We
+    therefore only enable the bounded infix/substring fallback for Thai tokens,
+    which avoids English false positives (e.g. ``son`` matching ``person``).
+    """
+    return any(_THAI_RANGE_START <= ch <= _THAI_RANGE_END for ch in token)
+
+
+def _substring_keys(conn, tokens):
+    """Find projected docs containing any Thai token as a substring.
+
+    Complements FTS5 discovery: FTS5 exact/prefix can locate a leading prefix of
+    a Thai token, but not a term buried inside one (``แมว`` in ``คู่มือแมวไทย``).
+    MATCH cannot express infix, so a LIKE scan over the already-normalized
+    snapshot is used. ``tokens`` were normalized to ``[0-9a-z<Thai>]`` only, so
+    they contain no LIKE wildcards. The scan is deterministic and bounded by the
+    number of projected rows.
+    """
+    thai_tokens = [t for t in tokens if len(t) >= MIN_PREFIX_LENGTH and _is_thai_token(t)]
+    if not thai_tokens:
+        return []
+    like = " AND ".join(["normalized_text LIKE ?"] * len(thai_tokens))
+    rows = conn.execute(
+        f"SELECT DISTINCT entity_type, entity_id FROM resolver_document_snapshot "
+        f"WHERE {like}",
+        tuple(f"%{t}%" for t in thai_tokens),
+    ).fetchall()
+    return [(r["entity_type"], r["entity_id"]) for r in rows]
+
+
 def _matched_keys(conn, matcher):
     rows = conn.execute(
-        "SELECT entity_type, entity_id FROM resolver_document_fts "
+        "SELECT DISTINCT entity_type, entity_id FROM resolver_document_fts "
         "WHERE resolver_document_fts MATCH ?",
         (matcher,),
     ).fetchall()
@@ -87,12 +138,65 @@ def _load_expansions(conn):
 def _score_doc(doc, tokens, expansions):
     reasons = []
     text_terms = set((doc.get("normalized_text") or "").split())
+    title_terms = set(normalize_text(doc.get("title")).split())
+    section_terms = set(normalize_text(doc.get("section_path")).split())
+    content_terms = set(normalize_text(doc.get("raw_content")).split())
+    # Title-equivalent fields position the fact ("title" plus any section path),
+    # so a prefix there ranks above a prefix buried in the raw body.
+    label_terms = title_terms | section_terms
     token_set = set(tokens)
+
     matched = [t for t in tokens if t in text_terms]
-    if not matched:
+    exact_title = [t for t in tokens if t in label_terms]
+    exact_content = [t for t in tokens if t in content_terms]
+    title_prefix = []
+    content_prefix = []
+    title_substring = []
+    content_substring = []
+    for t in tokens:
+        if len(t) < MIN_PREFIX_LENGTH:
+            continue
+        if t not in label_terms:
+            if any(w != t and w.startswith(t) for w in label_terms):
+                title_prefix.append(t)
+            elif _is_thai_token(t) and any(
+                t in w and not w.startswith(t) for w in label_terms
+            ):
+                title_substring.append(t)
+        if t not in content_terms:
+            if any(w != t and w.startswith(t) for w in content_terms):
+                content_prefix.append(t)
+            elif _is_thai_token(t) and any(
+                t in w and not w.startswith(t) for w in content_terms
+            ):
+                content_substring.append(t)
+
+    if not (
+        matched or exact_title or exact_content
+        or title_prefix or content_prefix or title_substring or content_substring
+    ):
         return 0.0, ["no_text_match"]
+
     score = float(len(matched))
-    reasons.append("token_match")
+    if matched:
+        reasons.append("token_match")
+    if exact_title:
+        score += len(exact_title) * BOOST_EXACT_TITLE
+        reasons.append("exact_title_match")
+    if exact_content:
+        score += len(exact_content) * BOOST_EXACT_CONTENT
+    if title_prefix:
+        score += len(title_prefix) * BOOST_TITLE_PREFIX
+        reasons.append("title_prefix_match")
+    if title_substring:
+        score += len(title_substring) * BOOST_TITLE_SUBSTRING
+        reasons.append("title_substring_match")
+    if content_prefix:
+        score += len(content_prefix) * BOOST_CONTENT_PREFIX
+        reasons.append("content_prefix_match")
+    if content_substring:
+        score += len(content_substring) * BOOST_CONTENT_SUBSTRING
+        reasons.append("content_substring_match")
 
     query_norm = " ".join(tokens)
     subject_norm = normalize_text(doc.get("subject"))
@@ -102,10 +206,10 @@ def _score_doc(doc, tokens, expansions):
     if set(subject_norm.split()) & token_set:
         score += BOOST_SUBJECT_TERM
         reasons.append("subject_match")
-    if set(normalize_text(doc.get("title")).split()) & token_set:
+    if title_terms & token_set:
         score += BOOST_TITLE
         reasons.append("title_match")
-    if set(normalize_text(doc.get("section_path")).split()) & token_set:
+    if section_terms & token_set:
         score += BOOST_TITLE * 0.5
         reasons.append("section_path_match")
     for alias in expansions["aliases"].get(doc.get("subject"), set()):
@@ -291,6 +395,13 @@ def search(conn, core_service, query, target=TARGET_AUTO, collection_id=None,
     if matcher is None:
         return _empty(query, target)
     keys = _matched_keys(conn, matcher)
+    # FTS5 exact/prefix cannot locate a token buried inside an unspaced Thai
+    # token (``แมว`` in ``คู่มือแมวไทย``), so also discover those candidates and
+    # merge/dedup them with the FTS hits.
+    extra = _substring_keys(conn, tokens)
+    if extra:
+        seen = set(keys)
+        keys.extend(k for k in extra if k not in seen)
     if not keys:
         return _empty(query, target)
     docs = []

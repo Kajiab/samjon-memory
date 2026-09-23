@@ -3,7 +3,7 @@
 # Service
 APP_TITLE = "Samjon Memory Core V1"
 APP_VERSION = "1.0.0"
-CORE_SCHEMA_VERSION = "1.1.0"
+CORE_SCHEMA_VERSION = "1.2.0"
 
 # Core database
 CORE_DB_FILENAME = "samjon_core.sqlite"
@@ -51,6 +51,7 @@ AUDIT_COLLECTION_CREATE = "collection_create"
 AUDIT_COLLECTION_UPDATE = "collection_update"
 AUDIT_COLLECTION_ACTIVATE = "collection_activate"
 AUDIT_COLLECTION_STRUCTURE_CHANGE = "collection_structure_change"
+AUDIT_COLLECTION_REOPENED = "collection_reopened"
 AUDIT_MEMORY_RESTORE = "memory_restore"
 AUDIT_COLLECTION_RESTORE = "collection_restore"
 AUDIT_MEMORY_PURGE = "memory_purge"
@@ -78,6 +79,34 @@ LIFECYCLE_AUTOMATIC_PURGE_ENABLED = False
 
 # Schema metadata
 SCHEMA_METADATA_KEY = "core_schema_version"
+
+# Media (images)
+MEDIA_ENTITY_TYPES = {"memory", "collection"}
+MEDIA_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MEDIA_EXTENSIONS = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
+MEDIA_LIFECYCLE_ACTIVE = "active"
+MEDIA_LIFECYCLE_HIDDEN = "hidden"
+MEDIA_LIFECYCLE_PURGED = "purged"
+MEDIA_LIFECYCLE_STATUSES = {
+    MEDIA_LIFECYCLE_ACTIVE,
+    MEDIA_LIFECYCLE_HIDDEN,
+    MEDIA_LIFECYCLE_PURGED,
+}
+# Pillow format id -> canonical mime
+MEDIA_FORMAT_MIME = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}
+
+# Audit actions
+AUDIT_MEDIA_UPLOAD = "media_upload"
+AUDIT_MEDIA_UPDATE = "media_update"
+AUDIT_MEDIA_REPLACE = "media_replace"
+AUDIT_MEDIA_SET_COVER = "media_set_cover"
+AUDIT_MEDIA_REORDER = "media_reorder"
+AUDIT_MEDIA_REMOVE = "media_remove"
+AUDIT_MEDIA_PURGE = "media_purge"
 
 # SQLite pragmas
 SQLITE_PRAGMAS = [

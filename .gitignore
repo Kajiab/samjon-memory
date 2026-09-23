@@ -17,7 +17,8 @@ htmlcov/
 *.sqlite-shm
 
 # Secrets
-*.env
+.env
+.env.*
 !.env.example
 
 # IDE

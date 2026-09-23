@@ -181,6 +181,104 @@ class ResolverService:
             context_budget=context_budget,
         )
 
+    def _freshness_map(self, core_service):
+        from samjon_memory.resolver import freshness as _freshness
+        return _freshness.compute(self.conn, core_service)
+
+    def freshness_summary(self, core_service):
+        counts = {"fresh": 0, "stale": 0, "missing": 0, "orphaned": 0}
+        for state in self._freshness_map(core_service).values():
+            counts[state] = counts.get(state, 0) + 1
+        return counts
+
+    def portal_dashboard(self, core_service):
+        state = self.state()
+        return {
+            "readiness": self.readiness()["resolver"],
+            "schema_version": RESOLVER_SCHEMA_VERSION,
+            "last_full_build_id": state.get("last_full_build_id"),
+            "projected_at": state.get("projected_at"),
+            "snapshot_checksum": state.get("snapshot_checksum"),
+            "counts": self._counts(),
+            "freshness_summary": self.freshness_summary(core_service),
+            "recent_builds": self.projection_audit(limit=10),
+        }
+
+    def portal_projection(self, core_service, entity_type=None,
+                          freshness_filter=None, limit=20, offset=0):
+        from samjon_memory.resolver import freshness as _freshness
+
+        current = _freshness.snapshot_current(core_service)
+        freshness = self._freshness_map(core_service)
+        kind_of = _freshness.kind_of
+        kinds = {
+            "memory": ("standalone_memory", "collection_memory"),
+            "collection": ("collection",),
+        }
+        rows = self.conn.execute(
+            "SELECT entity_type, entity_id, collection_id, core_version, "
+            "core_checksum FROM resolver_document_snapshot "
+            "ORDER BY entity_type, entity_id"
+        ).fetchall()
+        entries = []
+        for r in rows:
+            et = r["entity_type"]
+            if entity_type in ("memory", "collection") and et not in kinds[entity_type]:
+                continue
+            key = (kind_of(et), r["entity_id"])
+            fresh = freshness.get(key, "orphaned")
+            if freshness_filter and fresh != freshness_filter:
+                continue
+            cur = current.get(key)
+            entries.append({
+                "entity_type": et,
+                "entity_id": r["entity_id"],
+                "collection_id": r["collection_id"],
+                "core_version": cur[0] if cur else None,
+                "core_checksum": cur[1] if cur else None,
+                "projected_core_version": r["core_version"],
+                "projected_core_checksum": r["core_checksum"],
+                "freshness": fresh,
+            })
+        total = len(entries)
+        page = entries[offset:offset + limit]
+        return {"total": total, "count": len(page), "offset": offset, "entries": page}
+
+    def portal_evidence(self, core_service, entity_type, entity_id):
+        from samjon_memory.resolver import freshness as _freshness
+
+        fresh = self._freshness_map(core_service)
+        key = (entity_type, entity_id)
+        authoritative = None
+        if entity_type == "memory":
+            try:
+                authoritative = core_service.get_memory(entity_id)
+            except Exception:
+                authoritative = None
+        elif entity_type == "collection":
+            try:
+                authoritative = core_service.get_collection(entity_id)
+            except Exception:
+                authoritative = None
+        else:
+            return {"error": "invalid entity_type"}
+        proj = self.conn.execute(
+            "SELECT entity_type, entity_id, collection_id, sequence_number, "
+            "subject, title, section_path, source, language, core_version, "
+            "core_checksum, projected_at FROM resolver_document_snapshot "
+            "WHERE entity_id=? ORDER BY entity_type",
+            (entity_id,),
+        ).fetchone()
+        return {
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "authoritative": authoritative,
+            "projected": dict(proj) if proj else None,
+            "freshness": fresh.get(key, "orphaned"),
+            "provenance": "resolver_snapshot",
+            "authoritative_source": "CoreService",
+        }
+
     def projection_audit(self, limit: int = 20) -> list:
         """Return recent projection_audit rows (foundation, read-only)."""
         rows = self.conn.execute(

@@ -39,6 +39,11 @@ MAX_QUERY_LIMIT = 100
 MAX_NEIGHBORS = 10
 AMBIGUOUS_EPSILON = 0.001
 
+# Prefix matching
+# Forming a FTS5 prefix term is only useful for tokens of at least this length.
+# Shorter tokens are matched exact-only (single chars are far too noisy anyway).
+MIN_PREFIX_LENGTH = 2
+
 # Deterministic ranking weight constants
 BOOST_EXACT_SUBJECT = 10.0
 BOOST_TITLE = 5.0
@@ -46,6 +51,19 @@ BOOST_SUBJECT_TERM = 3.0
 BOOST_ALIAS = 2.0
 BOOST_VOCAB = 2.0
 BOOST_TAG = 1.0
+
+# Prefix search weight constants. Order is intentional:
+#   exact_title > exact_content > title_prefix > title_substring
+#   title_substring/content_substring only apply to partly-spaced scripts (Thai)
+# so an exact match always outranks a prefix-only match of the same token, a
+# true prefix outranks an infix hit, and a title prefix outranks a content
+# prefix (title carries more meaning).
+BOOST_EXACT_TITLE = 12.0
+BOOST_EXACT_CONTENT = 8.0
+BOOST_TITLE_PREFIX = 5.0
+BOOST_TITLE_SUBSTRING = 4.0
+BOOST_CONTENT_PREFIX = 3.0
+BOOST_CONTENT_SUBSTRING = 2.0
 
 # Projection audit build types
 BUILD_TYPE_FULL = "full"

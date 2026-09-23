@@ -23,6 +23,17 @@ class CoreConfig:
     purge_confirmation: str = field(default_factory=lambda: os.environ.get("SAMJON_LIFECYCLE_PURGE_CONFIRMATION", "PURGE"))
     cors_origins: list[str] = field(default_factory=lambda: os.environ.get("SAMJON_CORE_CORS_ORIGINS", "*").split(","))
 
+    # Media (images) configuration - typed, no unsafe defaults.
+    media_root: str = field(default_factory=lambda: os.environ.get("SAMJON_MEDIA_ROOT", "./data/media"))
+    media_max_upload_bytes: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_UPLOAD_BYTES", "10485760")))
+    media_max_width: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_WIDTH", "8192")))
+    media_max_height: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_HEIGHT", "8192")))
+    media_thumb_width: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_THUMB_WIDTH", "400")))
+    media_thumb_height: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_THUMB_HEIGHT", "400")))
+    media_max_per_entity: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_PER_ENTITY", "20")))
+    media_max_alt_text: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_ALT_TEXT", "500")))
+    media_max_caption: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_CAPTION", "2000")))
+
     @property
     def portal_username(self) -> str:
         return os.environ.get("SAMJON_PORTAL_USERNAME", "")

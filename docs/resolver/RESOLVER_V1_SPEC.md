@@ -6,12 +6,7 @@
 **Approver:** Jeab
 **Last reviewed:** 2026-09-20
 **Depends on:** Core V1.1 frozen baseline (`docs/core/CORE_V1_FREEZE.md`)
-**Implementation status:** Foundations A, B, C1, and C2 are implemented and tested
-(schema `1.1.0`, resolver readiness, full projection build, atomic + selective
-rebuild, expansion refresh, deterministic search + ranking, projection
-freshness, `allow_stale`, bounded context expansion, and the
-rebuild/query/selective API). The Resolver Portal remains PLANNED (not
-implemented).
+**Implementation status:** Foundations A, B, C1, C2, and D are implemented and tested. The Resolver Debug Portal is implemented; only MCP / Numchoke integration remains out of scope. See `RESOLVER_V1_FREEZE_EVALUATION.md` (all Resolver V1 freeze gates PASS -> READY_FOR_OWNER_APPROVAL).
 
 > This is a planning document. No code, migrations, routes, Portal, or
 > capability changes are implemented in this task. Resolver status is

@@ -40,9 +40,9 @@ def test_dashboard_shows_quick_actions(client, temp_db):
     app.state.service = svc
     svc.create_memory({"subject": "a", "raw_content": "c", "source": "t"})
     svc.create_collection({"subject": "col", "title": "Col", "source": "t"})
-    resp = client.get("/portal/")
+    resp = client.get("/portal/status")
     assert resp.status_code == 200
-    assert "Overview" in resp.text
+    assert "System Status" in resp.text
     assert "Standalone Memories" in resp.text
     assert "Total Facts" in resp.text
     assert "Collections" in resp.text

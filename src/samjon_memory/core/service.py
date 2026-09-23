@@ -1,21 +1,34 @@
 """Business logic layer for Samjon Memory Core."""
 
+import logging
+import random
+
 from samjon_memory.core.database import get_connection
 from samjon_memory.core.migration import ensure_schema
 from samjon_memory.core.repositories import CollectionRepo, MemoryRepo
+from samjon_memory.media.repository import MediaRepo
+from samjon_memory.media.storage import MediaStore
+from samjon_memory.media.service import MediaManager
 from samjon_memory.shared.helpers import generate_id, utc_now
 from samjon_memory.shared.checksum import content_checksum
 from samjon_memory.config import config
 from samjon_memory.errors import PermissionDenied, NotFound, VersionConflict, ValidationError
 from samjon_memory.constants import CORE_SCHEMA_VERSION, LIFECYCLE_PURGE_MIN_AGE_DAYS
 
+logger = logging.getLogger(__name__)
+
 
 class CoreService:
-    def __init__(self, database_path=None):
+    def __init__(self, database_path=None, media_root=None):
+        self.database_path = database_path or config.database_path
         self.conn = get_connection(database_path)
         ensure_schema(self.conn)
         self.collections = CollectionRepo(self.conn)
         self.memories = MemoryRepo(self.conn)
+        self.media = MediaRepo(self.conn)
+        self.media_root = media_root or config.media_root
+        self.media_store = MediaStore(self.media_root)
+        self.media_manager = MediaManager(self)
 
     def health(self):
         try:
@@ -55,6 +68,17 @@ class CoreService:
             raise NotFound(f"Memory not found: {memory_id}")
         if existing.get("purged_at"):
             raise ValidationError("Cannot edit a purged memory")
+        # Collection sections must always match the Collection's subject/scope.
+        coll_id = existing.get("collection_id")
+        if coll_id:
+            coll = self.collections.get(coll_id)
+            if coll:
+                subject = data.get("subject")
+                scope = data.get("scope")
+                if subject is not None and subject != coll.get("subject"):
+                    raise ValidationError("Section subject must match the Collection subject")
+                if scope is not None and scope != coll.get("scope"):
+                    raise ValidationError("Section scope must match the Collection scope")
         expected = data.pop("expected_version", None)
         result = self.memories.update(memory_id, data, expected)
         self._audit("memory", memory_id, "memory_update", actor, existing.get("source", ""), result["version"])
@@ -100,7 +124,70 @@ class CoreService:
                 "SELECT * FROM manual_override WHERE status='active' "
                 "ORDER BY override_id LIMIT ?"
             ),
+            "media": [
+                dict(r) for r in self.conn.execute(
+                    "SELECT entity_type, entity_id, alt_text, caption "
+                    "FROM media WHERE lifecycle_status='active' "
+                    "ORDER BY entity_type, entity_id, display_order"
+                ).fetchall()
+            ],
         }
+
+    # ---- Media (images) ----------------------------------------------------
+
+    def upload_media(self, entity_type, entity_id, data, alt_text=None, caption=None,
+                     actor="system"):
+        return self.media_manager.upload(entity_type, entity_id, data,
+                                         alt_text=alt_text, caption=caption, actor=actor)
+
+    def list_media(self, entity_type, entity_id):
+        return self.media_manager.list_media(entity_type, entity_id)
+
+    def get_media(self, media_id):
+        return self.media_manager.get_media(media_id)
+
+    def get_media_cover(self, entity_type, entity_id):
+        return self.media_manager.get_cover(entity_type, entity_id)
+
+    def set_media_cover(self, media_id, actor="system"):
+        return self.media_manager.set_cover(media_id, actor=actor)
+
+    def update_media_metadata(self, media_id, alt_text=None, caption=None, actor="system"):
+        return self.media_manager.update_metadata(media_id, alt_text=alt_text,
+                                                  caption=caption, actor=actor)
+
+    def reorder_media(self, entity_type, entity_id, ordered_media_ids, actor="system"):
+        return self.media_manager.reorder(entity_type, entity_id, ordered_media_ids,
+                                          actor=actor)
+
+    def replace_media(self, media_id, data, actor="system"):
+        return self.media_manager.replace(media_id, data, actor=actor)
+
+    def remove_media(self, media_id, actor="system"):
+        return self.media_manager.remove(media_id, actor=actor)
+
+    def read_media_original(self, media_id):
+        return self.media_manager.read_original(media_id)
+
+    def read_media_thumbnail(self, media_id):
+        return self.media_manager.read_thumbnail(media_id)
+
+    def media_integrity_check(self):
+        return self.media_manager.integrity_check()
+
+    def media_create_backup(self, backup_root):
+        from samjon_memory.media.backup import create_backup
+        return create_backup(self.media_manager, backup_root)
+
+    def media_check_backup(self, backup_root):
+        from samjon_memory.media.backup import check_backup
+        return check_backup(backup_root)
+
+    def media_restore_backup(self, backup_root):
+        from samjon_memory.media.backup import restore_backup
+        return restore_backup(self.media_manager, backup_root)
+
+    # ---- Resolver projection snapshot (media text) -------------------------
 
     def supersede_memory(self, memory_id, replacement_id, actor="system"):
         existing = self.memories.get(memory_id)
@@ -123,6 +210,7 @@ class CoreService:
         now = utc_now()
         self.conn.execute("UPDATE memory SET status='forgotten', forgotten_at=?, version=version+1, updated_at=? WHERE memory_id=?", (now, now, memory_id))
         self.conn.commit()
+        self.media_manager.hide_for_entity("memory", memory_id)
         self._audit("memory", memory_id, "memory_forget", actor, existing.get("source", ""), existing["version"] + 1)
         return {"forgotten": True, "memory_id": memory_id}
 
@@ -135,6 +223,7 @@ class CoreService:
         now = utc_now()
         self.conn.execute("UPDATE memory_collection SET status='forgotten', forgotten_at=?, version=version+1, updated_at=? WHERE collection_id=?", (now, now, collection_id))
         self.conn.commit()
+        self.media_manager.hide_for_entity("collection", collection_id)
         self._audit("collection", collection_id, "collection_forget", actor, existing.get("source", ""), existing["version"] + 1)
         return {"forgotten": True, "collection_id": collection_id}
 
@@ -256,9 +345,32 @@ class CoreService:
         }
         if data.get("sequence_number") is not None:
             section["sequence_number"] = data["sequence_number"]
-        created = self.create_memory(section, actor=actor)
-        self._audit("collection", collection_id, "collection_structure_change", actor,
-                    section.get("source", ""), coll["version"])
+        was_active = coll["status"] == "active"
+        if not was_active:
+            created = self.create_memory(section, actor=actor)
+            self._audit("collection", collection_id, "collection_structure_change", actor,
+                        section.get("source", ""), coll["version"])
+            return created
+        # Adding a Section to an Active Collection reopens it for editing: the
+        # new draft Section and the Collection -> draft revert happen in ONE
+        # transaction, and the Collection version increments once.
+        mid = generate_id("mem-")
+        section["memory_id"] = mid
+        section["content_checksum"] = content_checksum(section["raw_content"])
+        new_coll_version = coll["version"] + 1
+        try:
+            created = self.memories.create(section, commit=False)
+            self.conn.execute(
+                "UPDATE memory_collection SET status='draft', version=version+1, updated_at=? WHERE collection_id=?",
+                (utc_now(), collection_id),
+            )
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        self._audit("memory", mid, "memory_create", actor, section.get("source", ""), 1)
+        self._audit("collection", collection_id, "collection_reopened", actor,
+                    coll.get("source", ""), new_coll_version)
         return created
 
     def reorder_collection(self, collection_id, ordered_memory_ids, actor="system"):
@@ -282,16 +394,83 @@ class CoreService:
             raise ValidationError("Cannot activate a purged collection")
         if coll["status"] == "active":
             return coll
-        memories = self.memories.list(collection_id=collection_id, limit=1000)
+        # Fetch EVERY section belonging to the Collection (paged), never a single
+        # limited page, so activation cannot silently leave sections draft.
+        memories = []
+        offset = 0
+        while True:
+            page = self.memories.list(
+                collection_id=collection_id, limit=500, offset=offset,
+                order_by="sequence_number ASC")
+            memories.extend(page)
+            offset += len(page)
+            if len(page) < 500:
+                break
+        logger.info(
+            "[DEBUG-ACT8] activate start collection=%s db=%s sections=%d statuses_before=%s",
+            collection_id, getattr(self, "database_path", "?"), len(memories),
+            {m["memory_id"]: m["status"] for m in memories},
+        )
         if coll.get("expected_item_count") is not None and len(memories) != coll["expected_item_count"]:
             raise ValidationError(f"Expected {coll['expected_item_count']} items, found {len(memories)}")
         seq_nums = [m["sequence_number"] for m in memories if m["sequence_number"] is not None]
         if len(seq_nums) != len(set(seq_nums)):
             raise ValidationError("Duplicate sequence numbers in collection")
-        self.conn.execute("UPDATE memory_collection SET status='active', version=version+1, updated_at=? WHERE collection_id=?", (utc_now(), collection_id))
-        self.conn.commit()
-        self._audit("collection", collection_id, "collection_activate", actor, coll.get("source", ""), coll["version"] + 1)
+        # Only draft/active sections are allowed; forgotten/superseded/purged reject.
+        drafts = []
+        for m in memories:
+            if m.get("purged_at"):
+                raise ValidationError(f"Cannot activate collection: section {m['memory_id']} is purged")
+            if m["status"] not in ("draft", "active"):
+                raise ValidationError(
+                    f"Cannot activate collection: section {m['memory_id']} has status '{m['status']}'"
+                )
+            if m["status"] == "draft":
+                drafts.append(m)
+        now = utc_now()
+        try:
+            # Activate all draft sections (version+1); active sections are untouched.
+            for m in drafts:
+                self.conn.execute(
+                    "UPDATE memory SET status='active', version=version+1, updated_at=? WHERE memory_id=?",
+                    (now, m["memory_id"]),
+                )
+            self.conn.execute(
+                "UPDATE memory_collection SET status='active', version=version+1, updated_at=? WHERE collection_id=?",
+                (now, collection_id),
+            )
+            self.conn.commit()
+            transaction = "committed"
+        except Exception:
+            self.conn.rollback()
+            transaction = "rolled_back"
+            logger.info(
+                "[DEBUG-ACT8] activate FAILED collection=%s db=%s transaction=%s",
+                collection_id, getattr(self, "database_path", "?"), transaction,
+            )
+            raise
+        after = {
+            m2["memory_id"]: m2["status"]
+            for m2 in self.memories.list(collection_id=collection_id, limit=len(memories) + 1)
+        }
+        logger.info(
+            "[DEBUG-ACT8] activate done collection=%s db=%s collection_status_before=%s "
+            "collection_status_after=active transaction=%s drafts_activated=%d statuses_after=%s",
+            collection_id, getattr(self, "database_path", "?"), coll["status"],
+            transaction, len(drafts), after,
+        )
+        new_collection_version = coll["version"] + 1
+        self._audit("collection", collection_id, "collection_activate", actor, coll.get("source", ""), new_collection_version)
+        for m in drafts:
+            self._audit("memory", m["memory_id"], "memory_activate", actor, coll.get("source", ""), m["version"] + 1)
         return self.collections.get(collection_id)
+
+    def collection_was_reopened(self, collection_id):
+        row = self.conn.execute(
+            "SELECT 1 FROM audit_log WHERE entity_type='collection' AND entity_id=? AND action='collection_reopened' LIMIT 1",
+            (collection_id,),
+        ).fetchone()
+        return row is not None
 
     def validate_collection(self, collection_id):
         coll = self.collections.get(collection_id)
@@ -311,6 +490,20 @@ class CoreService:
 
     def get_collection_memories(self, collection_id, limit=20, offset=0):
         return self.memories.list(collection_id=collection_id, limit=limit, offset=offset, order_by="sequence_number ASC")
+
+    def get_collection_memories_all(self, collection_id):
+        """Read-only: every section of the Collection (paged, in order)."""
+        memories = []
+        offset = 0
+        while True:
+            page = self.memories.list(
+                collection_id=collection_id, limit=500, offset=offset,
+                order_by="sequence_number ASC")
+            memories.extend(page)
+            offset += len(page)
+            if len(page) < 500:
+                break
+        return memories
 
     def get_audit_records(self, entity_id=None, entity_type=None, action=None, since=None, until=None, limit=50, offset=0):
         """Retrieve audit records with filters and pagination (append-only)."""
@@ -424,6 +617,7 @@ class CoreService:
             (utc_now(), memory_id),
         )
         self.conn.commit()
+        self.media_manager.restore_for_entity("memory", memory_id)
         self._audit("memory", memory_id, "memory_restore", actor, existing.get("source", ""), existing["version"] + 1)
         if existing.get("collection_id"):
             self._bump_collection_version(existing["collection_id"], actor, existing.get("source", ""))
@@ -442,6 +636,7 @@ class CoreService:
             (utc_now(), collection_id),
         )
         self.conn.commit()
+        self.media_manager.restore_for_entity("collection", collection_id)
         self._audit("collection", collection_id, "collection_restore", actor, existing.get("source", ""), existing["version"] + 1)
         return self.collections.get(collection_id)
 
@@ -497,6 +692,7 @@ class CoreService:
         except Exception:
             self.conn.rollback()
             raise
+        self.media_manager.purge_entity("memory", memory_id, actor=actor)
         self._audit("memory", memory_id, "memory_purge", actor, source, new_version)
         return self.memories.get(memory_id)
 
@@ -522,6 +718,7 @@ class CoreService:
             (utc_now(), actor, utc_now(), collection_id),
         )
         self.conn.commit()
+        self.media_manager.purge_entity("collection", collection_id, actor=actor)
         self._insert_tombstone("collection", collection_id, new_version, existing.get("content_checksum"), actor)
         self._audit("collection", collection_id, "collection_purge", actor, existing.get("source", ""), new_version)
         return self.collections.get(collection_id)
@@ -606,6 +803,52 @@ class CoreService:
             bad = self._invalid_collection_ids()
             rows = [c for c in rows if c["collection_id"] in bad]
         return rows
+
+    def library_active(self, collection_limit=500, memory_limit=500):
+        """Read-only, bounded set of active Collections and standalone Memories."""
+        collections = self.collections.list(status="active", limit=collection_limit, offset=0)
+        memories = self.memories.list(status="active", collection_scope="standalone",
+                                      limit=memory_limit, offset=0)
+        return {"collections": collections, "memories": memories}
+
+    def _library_cover(self, entity_type, entity):
+        try:
+            eid = entity.get("collection_id") if entity_type == "collection" else entity.get("memory_id")
+            return self.get_media_cover(entity_type, eid)
+        except Exception:
+            return None
+
+    def library_discover(self, limit=12):
+        """Bounded in-memory random selection of active Library entities.
+
+        Collections + standalone Memories only (never Sections). Bounded sample
+        over library_active() -- no DB random ordering.
+        """
+        active = self.library_active(collection_limit=120, memory_limit=240)
+        cands = ([("collection", c) for c in active["collections"]]
+                 + [("memory", m) for m in active["memories"]])
+        if not cands:
+            return []
+        chosen = random.sample(cands, min(limit, len(cands)))
+        out = []
+        for t, e in chosen:
+            e["_type"] = t
+            e["cover"] = self._library_cover(t, e)
+            out.append(e)
+        return out
+
+    def library_recent(self, limit=8):
+        """Recently updated active Library entities, ordered by updated_at DESC."""
+        active = self.library_active(collection_limit=500, memory_limit=500)
+        items = ([("collection", c) for c in active["collections"]]
+                 + [("memory", m) for m in active["memories"]])
+        items.sort(key=lambda it: it[1].get("updated_at") or "", reverse=True)
+        out = []
+        for t, e in items[:limit]:
+            e["_type"] = t
+            e["cover"] = self._library_cover(t, e)
+            out.append(e)
+        return out
 
     def _db_ok(self):
         try:

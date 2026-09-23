@@ -20,6 +20,11 @@ Durable text and structured-memory backend with SQLite, aliases, tags, vocabular
 ## Running Tests
 
 ```bash
-python -m pytest tests/ -v
-# 153 passed, 0 failed, 0 skipped
+powershell -ExecutionPolicy Bypass -File .\scripts\test-local.ps1
+```
+
+## Running Locally
+
+```bash
+powershell -ExecutionPolicy Bypass -File .\scripts\run-local.ps1
 ```
