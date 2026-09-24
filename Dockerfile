@@ -24,7 +24,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /build
 
 # Copy package metadata first for layer caching.
-COPY pyproject.toml ./
+# MANIFEST.in is required by setuptools to ship the Jinja templates and Portal
+# static assets as package data; README is referenced by MANIFEST.in.
+COPY pyproject.toml MANIFEST.in README.md ./
 # Copy the application source.
 COPY src ./src
 
