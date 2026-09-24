@@ -107,3 +107,34 @@ def test_missing_template_returns_controlled_document():
 def test_all_templates_compile():
     from samjon_memory.portal import templating
     assert templating.validate_templates() == []
+
+
+# ---- Required behavioral coverage -------------------------------------------
+
+def test_search_result_action_markup():
+    """Search-result cards expose the equal-dimension action system."""
+    from samjon_memory.portal import templating, viewmodels
+    card = viewmodels.result_card_vm(
+        {"memory_id": "m1", "title": "T", "subject": "s", "collection_id": "c1"},
+        "section")
+    html = templating.render_partial("components/result_card.html", card=card)
+    assert 'class="result-actions"' in html
+    assert "result-action-primary" in html          # อ่านบทนี้ primary
+    assert "result-action-secondary" in html        # เปิดทั้งชุด secondary
+    assert "technical-action" in html               # รายละเอียดทางเทคนิค collapsed
+    assert "อ่านบทนี้" in html and "เปิดทั้งชุด" in html
+
+
+def test_memory_reader_no_mutation_forms_and_no_side_effects(client, temp_db):
+    """Reader pages contain no mutation forms and rendering changes nothing."""
+    from samjon_memory.core.service import CoreService
+    svc = CoreService(database_path=temp_db)
+    app.state.service = svc
+    m = svc.create_memory({"subject": "rose", "title": "Rose",
+                           "raw_content": "sunlight", "source": "t"})
+    svc.activate_memory(m["memory_id"])
+    version_before = svc.get_memory(m["memory_id"])["version"]
+    body = client.get(f"/portal/library/memories/{m['memory_id']}").text
+    assert "<form" not in body
+    assert 'action="/portal/media/' not in body
+    assert svc.get_memory(m["memory_id"])["version"] == version_before
