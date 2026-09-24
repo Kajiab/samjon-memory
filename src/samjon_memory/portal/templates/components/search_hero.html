@@ -1,0 +1,9 @@
+<section class="search-hero"><h1>{{ hero.title }}</h1>
+<p class="search-hint">{{ hero.hint }}</p>
+<form method="post" action="/portal/search" class="search-form">
+<input type="hidden" name="target" value="auto"/>
+<input class="search-input" id="lib-search-q" name="q" value="{{ hero.q }}" aria-label="Search the knowledge library" placeholder="เช่น วิธีรดน้ำต้นไม้, การดูแลสวน" autofocus/>
+<button type="submit" class="btn search-btn">ค้นหา</button>
+</form>
+<p class="search-target">{{ hero.target }}</p>
+</section>

@@ -1,0 +1,4 @@
+{% macro panel(rows, label='รายละเอียดทางเทคนิค') %}
+<details class="technical result-action technical-action"><summary>{{ label }}</summary>
+<dl>{% for r in rows %}<dt>{{ r.label }}</dt><dd class="mono">{{ r.value }}</dd>{% endfor %}</dl></details>
+{% endmacro %}

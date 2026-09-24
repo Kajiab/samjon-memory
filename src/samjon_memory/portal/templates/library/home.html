@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "components/search_hero.html" %}
+{% include "components/banner.html" %}
+<section class="lib-section"><h2>Browse by Subject</h2>
+<p class="section-hint">เรียกดูตามหมวดหมู่ของหัวข้อ</p>
+<div class="lib-cat-grid">
+{% for cat in categories %}{% include "components/category_card.html" %}{% endfor %}
+</div></section>
+<section class="lib-section"><h2>Discover</h2><p class="section-hint">ลองเปิดดู</p>
+<div class="lib-card-grid">
+{% for card in discover %}{% include "components/library_card.html" %}{% endfor %}
+</div></section>
+<section class="lib-section"><h2>Recently Updated</h2><p class="section-hint">รายการที่อัปเดตล่าสุด</p>
+<div class="lib-card-grid">
+{% for card in recent %}{% include "components/library_card.html" %}{% endfor %}
+</div></section>
+{% endblock %}

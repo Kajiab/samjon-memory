@@ -1489,20 +1489,10 @@ def _category_cover(cat) -> str:
 
 
 def _category_card(cat) -> str:
-    key = _e(cat.get("key") or "")
-    name = _e(cat.get("name") or "")
-    hint = _e(cat.get("hint") or "")
-    counts = _cat_counts(cat)
-    cover = _category_cover(cat)
-    return (
-        f'<a class="lib-cat" href="/portal/library/subjects/{key}">'
-        + cover
-        + '<div class="lib-cat-body">'
-        + f'<span class="lib-cat-name">{name}</span>'
-        + f'<span class="lib-cat-hint">{hint}</span>'
-        + f'<span class="lib-cat-counts">{counts}</span>'
-        + "</div></a>"
-    )
+    """Thin wrapper: render the shared category-card component (single impl)."""
+    from samjon_memory.portal import templating, viewmodels
+    return templating.render_partial(
+        "components/category_card.html", cat=viewmodels.category_card_vm(cat))
 
 
 

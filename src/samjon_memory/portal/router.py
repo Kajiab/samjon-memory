@@ -10,6 +10,8 @@ from samjon_memory.errors import SamjonMemoryError
 from samjon_memory.config import config
 from samjon_memory.constants import DEFAULT_PAGE_SIZE
 import samjon_memory.portal.pages as pages
+import samjon_memory.portal.templating as templating
+import samjon_memory.portal.viewmodels as viewmodels
 import samjon_memory.resolver.portal as rpages
 from samjon_memory.resolver.service import ResolverService
 
@@ -112,8 +114,9 @@ async def portal_index(request: Request, _: str = Depends(portal_auth)):
             cat["entity_cover"] = cover
     discover = svc.library_discover(12)
     recent = svc.library_recent(8)
-    return HTMLResponse(content=pages.library_home(
-        categories=categories, discover=discover, recent=recent, q=q))
+    return HTMLResponse(content=templating.render(
+        "library/home.html", active="library",
+        **viewmodels.library_home_vm(categories, discover, recent, q)))
 
 
 @router.get("/portal/status", response_class=HTMLResponse)
@@ -143,9 +146,10 @@ async def portal_subject_category(request: Request, category_key: str, _: str = 
     for t, e in page:
         e["cover"] = svc._library_cover(t, e)
         (page_cols if t == "collection" else page_mems).append(e)
-    return HTMLResponse(content=pages.category_page(
-        category=category, collections=page_cols, memories=page_mems,
-        offset=offset, total=total, page_size=page_size))
+    return HTMLResponse(content=templating.render(
+        "library/category.html", active="library",
+        **viewmodels.category_page_vm(category, page_cols, page_mems,
+                                      offset, total, page_size)))
 
 
 @router.get("/portal/admin", response_class=HTMLResponse)
@@ -718,10 +722,10 @@ def _portal_search_page(request, q):
     memories = [e for e in enriched if e.get("result_type") == "standalone_memory"]
     collections = [e for e in enriched if e.get("result_type") in ("collection", "collection_with_selected_memories")]
     sections = [e for e in enriched if e.get("result_type") == "collection_memory"]
-    return HTMLResponse(content=pages.search_page(
-        q=q, memories=memories, collections=collections, sections=sections,
-        stale=stale, error=error, total=total, suggestion=_suggestion_for(q),
-    ))
+    return HTMLResponse(content=templating.render(
+        "search.html", active="library",
+        **viewmodels.search_vm(q, memories, collections, sections,
+                               stale, error, total, _suggestion_for(q))))
 
 
 @router.get("/portal/search", response_class=HTMLResponse)

@@ -1,0 +1,15 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="color-scheme" content="light"/>
+<title>{% block title %}Samjon Memory Portal{% endblock %}</title>
+<link rel="stylesheet" href="/portal/static/portal.css"/>
+<script src="/portal/static/portal.js" defer></script>
+</head><body>
+<a class="skip-link" href="#main">Skip to content</a>
+<main id="main">
+{% include "components/navbar.html" %}
+{% block content %}{% endblock %}
+</main>
+<footer class="footer"><p>Samjon Memory Core Portal</p></footer>
+</body></html>

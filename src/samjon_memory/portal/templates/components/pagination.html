@@ -1,0 +1,3 @@
+{% if pager %}
+<nav class="pager" aria-label="Pagination"><span>หน้า {{ pager.page }}</span>{% if pager.prev %}<a class="btn btn-xsmall btn-ghost" href="{{ pager.prev }}">&larr; ก่อนหน้า</a>{% endif %}{% if pager.next %}<a class="btn btn-xsmall btn-ghost" href="{{ pager.next }}">ถัดไป &rarr;</a>{% endif %}</nav>
+{% endif %}

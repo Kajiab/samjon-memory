@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "components/search_hero.html" %}
+{% if stale %}<div class="banner warning" role="status">ผลการค้นหาอาจล้าสมัย (ยังไม่ได้สร้างดัชนีใหม่) เปิดดูรายการเพื่อดูเวอร์ชันปัจจุบัน หรือขอให้ผู้ดูแลสร้างดัชนีใหม่</div>{% endif %}
+{% if error %}<div class="banner error" role="alert">{{ error }}</div>{% endif %}
+{% if not q %}
+<div class="empty-state"><p>พิมพ์คำค้นด้านบนเพื่อเริ่มค้นหา</p></div>
+{% elif total == 0 %}
+{% include "components/no_results.html" %}
+{% else %}
+<p class="count">พบ {{ total }} รายการ</p>
+{% for group in groups %}
+<section class="result-group"><h2>{{ group.label }}</h2>
+<div class="result-list">
+{% for card in group.cards %}{% include "components/result_card.html" %}{% endfor %}
+</div></section>
+{% endfor %}
+{% endif %}
+{% endblock %}

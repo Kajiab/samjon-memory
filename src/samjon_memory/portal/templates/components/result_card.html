@@ -1,0 +1,18 @@
+{% import 'components/cover.html' as cover %}
+{% import 'components/technical_details.html' as tech %}
+<article class="lib-card">
+{{ cover.frame(card.cover) }}
+<div class="lib-body">
+<span class="result-kind">{{ card.kind_label }}</span>
+<h3 class="lib-title">{{ card.title }}</h3>
+{% if card.badge %}<span class="badge {{ card.badge.status }}">{{ card.badge.label }}</span>{% endif %}
+{% if card.excerpt %}<p class="result-excerpt lib-excerpt">{{ card.excerpt }}</p>{% endif %}
+{% if card.count %}<p class="lib-chapter-count">จำนวนบท {{ card.count }}</p>{% endif %}
+{% if card.selected %}<ul class="selected-sections">{% for s in card.selected %}<li><a href="/portal/memories/{{ s.memory_id }}">{{ s.title }}</a></li>{% endfor %}</ul>{% endif %}
+</div>
+<div class="result-actions">
+{% for a in card.actions %}
+{% if a.action == 'technical' %}{{ tech.panel(card.tech_rows, a.label) }}{% else %}<a class="btn{% if a.secondary %} btn-ghost{% endif %} result-action{% if not a.secondary %} result-action-primary{% else %} result-action-secondary{% endif %} result-open" href="{{ a.href }}">{{ a.label }}</a>{% endif %}
+{% endfor %}
+</div>
+</article>

@@ -1,0 +1,11 @@
+{% import 'components/cover.html' as cover %}
+<article class="lib-card">
+{{ cover.frame(card.cover) }}
+<div class="lib-body">
+<span class="result-kind">{{ card.label }}</span>
+<h3 class="lib-title">{{ card.title }}</h3>
+{% if card.subject %}<span class="lib-subject">{{ card.subject }}</span>{% endif %}
+{% if card.excerpt %}<p class="result-excerpt lib-excerpt">{{ card.excerpt }}</p>{% endif %}
+</div>
+{% if card.link %}<div class="lib-actions"><a class="btn" href="{{ card.link }}">{{ card.button }}</a></div>{% endif %}
+</article>

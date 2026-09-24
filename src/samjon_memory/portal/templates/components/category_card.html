@@ -1,0 +1,8 @@
+{% import 'components/cover.html' as cover %}
+<a class="lib-cat" href="/portal/library/subjects/{{ cat.key }}">
+{{ cover.frame(cat.cover) }}
+<div class="lib-cat-body">
+<span class="lib-cat-name">{{ cat.name }}</span>
+<span class="lib-cat-hint">{{ cat.hint }}</span>
+<span class="lib-cat-counts">{{ cat.counts }}</span>
+</div></a>

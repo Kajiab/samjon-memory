@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="breadcrumb"><a href="/portal/">Library</a> › <span>{{ category.name }}</span></p>
+<h1>{{ category.name }}</h1>
+<p class="section-hint">{{ category.hint }}</p>
+{% if collections %}<h2 class="lib-cat-sub">ชุดความรู้</h2><div class="lib-card-grid">
+{% for card in collections %}{% include "components/library_card.html" %}{% endfor %}
+</div>{% endif %}
+{% if memories %}<h2 class="lib-cat-sub">บันทึกความรู้</h2><div class="lib-card-grid">
+{% for card in memories %}{% include "components/library_card.html" %}{% endfor %}
+</div>{% endif %}
+{% if not collections and not memories %}<div class="empty-state"><p>ยังไม่มีรายการในหมวดนี้</p></div>{% endif %}
+{% if pager %}{% include "components/pagination.html" %}{% endif %}
+{% endblock %}

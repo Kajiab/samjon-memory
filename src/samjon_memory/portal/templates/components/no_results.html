@@ -1,0 +1,5 @@
+<div class="empty-state no-results">
+<p>ไม่พบผลลัพธ์สำหรับ “{{ q }}”.</p>
+<p>ลองพิมพ์คำอื่นหรือใช้คำค้นที่สั้นกว่า</p>
+{% if suggestion %}<p class="hint">คำแนะนำ: {{ suggestion }}</p>{% endif %}
+</div>
