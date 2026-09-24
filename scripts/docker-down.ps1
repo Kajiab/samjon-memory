@@ -3,10 +3,12 @@
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\docker-down.ps1
 #
-# Note: persistent data lives in the `samjon_memory_data` volume and is NOT
-# removed by `down`. Use `docker compose down -v` only if you intend to delete
-# all data (irreversible).
+# This command never removes volumes or data. Persistent data lives on the host
+# under ./data via a bind mount and is always retained on `down`. Deleting all
+# data is a manual, explicit action and is never triggered by this script.
 $ErrorActionPreference = 'Stop'
+
+$repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Write-Error "Docker is not installed or not on PATH. Install Docker first."
@@ -14,10 +16,14 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Stopping Samjon Memory (docker compose down)..."
+Push-Location $repo
 docker compose down
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "docker compose down failed (exit $LASTEXITCODE)."
-    exit $LASTEXITCODE
+$code = $LASTEXITCODE
+Pop-Location
+
+if ($code -ne 0) {
+    Write-Error "docker compose down failed (exit $code)."
+    exit $code
 }
-Write-Host "Samjon Memory stopped. Persistent data volume retained." -ForegroundColor Green
+Write-Host "Samjon Memory stopped. Host data under ./data is retained." -ForegroundColor Green
 exit 0

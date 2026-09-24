@@ -1,18 +1,19 @@
 # Samjon Memory - Docker deployment
 
 Containers Samjon Memory (Core, Resolver, Media, Portal) as a self-contained,
-production-like local service. The image runs as a non-root user, stores all
-durable data under a persistent volume, and needs no host Python or virtual
-environment.
+production-like local service. The image runs as a non-root user and persists all
+durable data on the host via **bind mounts** - the host sees and owns the data.
 
 - [Files](#files)
 - [Architecture](#architecture)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
+- [Bind mounts & host layout](#bind-mounts--host-layout)
 - [Persistence & permissions](#persistence--permissions)
 - [Operations](#operations)
 - [Security notes](#security-notes)
 - [Backup & restore](#backup--restore)
+- [When a rebuild is required](#when-a-rebuild-is-required)
 - [Portainer stack](#portainer-stack)
 - [Troubleshooting](#troubleshooting)
 - [Design decisions](#design-decisions)
@@ -22,11 +23,11 @@ environment.
 | File | Purpose |
 | ---- | ------- |
 | `Dockerfile` | Multi-stage build (builder + runtime image) |
-| `compose.yaml` | Recommended `docker compose` deployment |
+| `compose.yaml` | Recommended `docker compose` deployment (bind mounts) |
 | `.dockerignore` | Keeps tests / venv / data / secrets out of the build context |
 | `.env.docker.example` | Template for stack configuration (copy to `.env`) |
 | `.env.example` | (repo root) original local-dev template; unaffected |
-| `samjon_stack.yaml` | Self-contained Portainer stack (compose-compatible) |
+| `samjon_stack.yaml` | Self-contained Portainer stack (absolute bind paths) |
 | `scripts/docker-*.ps1` | Convenience wrappers around `docker compose` |
 | `docs/deployment/docker.md` | This document |
 
@@ -41,9 +42,11 @@ Browser (Portal) / Numchoke (HTTP APIs)
         +-- /app/data/samjon_core.sqlite      (Core, authoritative)
         +-- /app/data/samjon_resolver.sqlite  (Resolver, derived/rebuildable)
         +-- /app/data/media/                  (originals, thumbnails, archived)
+        +-- /app/data/backups/
         |
-        v
-  named volume: samjon_memory_data:/app/data  (persistent on the host)
+        v  bind mounts (host-visible)
+  ./data            /app/data
+  ./category-covers /app/category-covers (read-only)
 ```
 
 - The application container is the **only** owner of every SQLite file and media
@@ -62,7 +65,7 @@ Prerequisites: Docker Engine with the Compose plugin (Docker Desktop covers both
 Copy-Item .env.docker.example .env
 #    edit .env and set at least SAMJON_PORTAL_USERNAME and SAMJON_PORTAL_PASSWORD
 
-# 2) Build and start
+# 2) Build and start (creates ./data and ./category-covers host dirs first)
 powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1
 #    equivalent: docker compose up -d --build
 ```
@@ -72,9 +75,6 @@ Then open:
 - Portal UI: <http://localhost:8100/portal/> (HTTP Basic - use the Portal credentials)
 - Health:  <http://localhost:8100/health>
 - Resolver Debug: <http://localhost:8100/portal/resolver/>
-
-On another machine the same commands build and run the service; all state stays
-in the `samjon_memory_data` volume, so no host paths need to exist.
 
 ## Configuration
 
@@ -97,28 +97,76 @@ Fixed container layout:
 SAMJON_CORE_DATABASE_PATH=/app/data/samjon_core.sqlite
 SAMJON_RESOLVER_DATABASE_PATH=/app/data/samjon_resolver.sqlite
 SAMJON_MEDIA_ROOT=/app/data/media
+SAMJON_CATEGORY_COVERS_ROOT=/app/category-covers
 ```
 
 The full list of tunable variables is in `.env.docker.example`.
 
+## Bind mounts & host layout
+
+`compose.yaml` uses two host-visible bind mounts (no named volume):
+
+| Host path (relative to compose project) | Container path | Mode |
+| ---- | ---- | ---- |
+| `./data` | `/app/data` | read-write |
+| `./category-covers` | `/app/category-covers` | read-only |
+
+Persisted under the repository-local `./data/`:
+
+```text
+data/
+├── samjon_core.sqlite
+├── samjon_resolver.sqlite
+├── media/
+│   ├── originals/
+│   ├── thumbnails/
+│   └── archived/
+└── backups/
+```
+
+SQLite files are never mounted individually; the whole `data/` directory is
+mounted as one unit. `category-covers/` holds replaceable configured category
+covers (JPEG/JPG/PNG/WebP); user-uploaded media never lives there.
+
 ## Persistence & permissions
 
-- `compose.yaml` mounts the named volume **`samjon_memory_data`** at `/app/data`.
-  Named volumes survive `docker compose down` and container rebuilds.
-- The image pre-creates `/app/data` and its subdirectories, owned by the non-root
-  `samjon` user (uid/gid `10001`). On first use Docker copies that ownership into
-  the new named volume, so the app can write with no privileged entrypoint.
-- If you prefer a bind mount (files visible under a host path), replace the
-  volume with e.g. `./samjon-data:/app/data`; on Linux the host directory must be
-  writable by uid `10001` (`chown -R 10001:10001 ./samjon-data`). The named
-  volume avoids this on all platforms.
+- Data lives directly on the host under `./data` (bind mount to `/app/data`).
+  It survives `docker compose down` and image rebuilds - it is never stored in
+  the image and never inside a Docker-managed named volume.
+- The container runs as the non-root user `samjon` (uid/gid `10001`). It must be
+  able to create and write `/app/data` and `/app/data/media`.
+- On startup (production mode) the application runs a **writeability check** for
+  `/app/data` and `/app/data/media`: it creates them from trusted configuration
+  if missing and fails with a clear message if `/app/data` is not writable. An
+  unwritable host mount therefore surfaces as a startup error in the logs rather
+  than an obscure crash. The application never recursively `chown`s arbitrary
+  host paths from a privileged entrypoint.
+- **Windows / Docker Desktop:** bind mounts into a Linux container are generally
+  read/writable without extra setup; Docker Desktop maps the Windows folder into
+  the Linux VM transparently.
+- **Linux:** the container user is uid/gid `10001`. A host directory owned by
+  your user/root is **not** writable by the container. Either pre-create and own
+  it, or set ownership once:
+
+  ```bash
+  sudo chown -R 10001:10001 ./data
+  ```
+
+  (Repeat after a fresh clone/`git clean`, which recreates owned-by-root dirs.)
+- If you keep a `category-covers/` folder empty, configured category covers are
+  simply absent and the app falls back to Collection/Memory covers, then the
+  placeholder. To restore the packaged look in Docker, copy the bundled covers:
+
+  ```powershell
+  Copy-Item .\src\samjon_memory\portal\static\category-covers\* .\category-covers\
+  ```
 
 ## Operations
 
 ```powershell
 .\scripts\docker-build.ps1            # build only
-.\scripts\docker-up.ps1               # build + start detached
-.\scripts\docker-down.ps1             # stop (data kept)
+.\scripts\docker-up.ps1               # creates host dirs, then build + start detached
+.\scripts\docker-down.ps1             # stop (data kept on host)
 .\scripts\docker-logs.ps1 -Follow     # follow logs
 .\scripts\docker-test.ps1             # build + start + health/Portal smoke test
 ```
@@ -141,70 +189,110 @@ Health check: compose marks the service healthy once `GET /health` returns
   exposed on the published port (default `8100`). Do not expose the service to
   the public internet; it is intended for an explicitly trusted local network.
 - SQLite files are owned only by the `samjon` user inside the container and live
-  on a host-persistent volume - never bake them into the image.
+  on a host bind mount - never bake them into the image.
 - Leave `SAMJON_CORE_ENV=production`. The REST API becomes token-authenticated
   when the three tokens are set; the Portal always requires HTTP Basic.
 - Never commit `.env`; it is excluded by `.gitignore` and `.dockerignore`.
 
 ## Backup & restore
 
-Back up the whole `/app/data` while the container is stopped (keeps SQLite + WAL
-consistent):
+Data backup:
 
-```bash
-docker compose stop
-docker run --rm -v samjon_memory_data:/data -v "$PWD:/backup" alpine \
-  tar czf /backup/samjon-memory-backup.tgz -C /data .
-docker compose start
-```
+1. Stop the service: `docker compose stop` (or `docker-down.ps1`).
+2. Copy the **complete** `data/` directory to your backup location
+   (e.g. `data/` -> `backup/YYYY-MM-DD/data/`).
+3. Start the service: `docker compose start` (or `docker-up.ps1`).
 
-Restore:
+Data restore:
 
-```bash
-docker compose stop
-docker run --rm -v samjon_memory_data:/data -v "$PWD:/backup" alpine \
-  sh -c "rm -rf /data/* && tar xzf /backup/samjon-memory-backup.tgz -C /data"
-docker compose start
-```
+1. Stop the service.
+2. Back up the current `data/` directory (safety copy).
+3. Replace the complete `data/` directory with the backup.
+4. Start the service.
+5. Verify health (`/health`) and the Library (Portal) list/reader.
 
-The Resolver database is a disposable projection - after restoring a Core backup
-it can be rebuilt on demand. Core is the authoritative, backup-critical store.
+Warnings:
+
+- Never copy a live SQLite file independently (an open WAL database is
+  inconsistent mid-write); always copy `data/` with the service stopped.
+- Core DB, Resolver DB, and media should move together as one directory tree.
+- Do not copy only `*-wal`/`*-shm` files - they are sidecars of a live DB.
+- Configured **category covers are a separate concern**: they live in
+  `category-covers/` (`./category-covers` on the host) and are backed up/replaced
+  independently of runtime media.
+
+## When a rebuild is required
+
+- **Data or uploaded images changed** (Core/Resolver records, `data/media`):
+  no image rebuild required. Stop the service, copy files into `./data`, start.
+  (SQLite files must be moved while the service is stopped.)
+- **Category covers changed:** copy the new images into `category-covers/`; a
+  container **restart is sufficient** (`docker compose restart` or
+  `docker-up.ps1`). No rebuild.
+- **Python / Jinja / CSS / JavaScript / dependencies changed:** a Docker image
+  rebuild is required (`docker compose up -d --build`), because those assets are
+  baked into the image.
+
+Do not bind-mount application source into the container in production; keep the
+immutable image as the single source of application code.
 
 ## Portainer stack
 
-`samjon_stack.yaml` is a self-contained Compose file for Portainer Standalone:
+`samjon_stack.yaml` is a self-contained Compose file for Portainer Standalone.
+Portainer treats relative bind paths ambiguously, so it uses **absolute
+placeholder** host paths that you must edit before deploying:
+
+```yaml
+volumes:
+  - type: bind
+    source: /absolute/path/to/samjon-memory/data        # EDIT
+    target: /app/data
+  - type: bind
+    source: /absolute/path/to/samjon-memory/category-covers  # EDIT
+    target: /app/category-covers
+    read_only: true
+```
+
+Example (clearly an example, not hard-coded for you):
+
+```text
+D:/HomeAssistant/samjon-memory/data:/app/data
+D:/HomeAssistant/samjon-memory/category-covers:/app/category-covers:ro
+```
 
 1. Portainer > Stacks > Add stack.
 2. Paste the contents of `samjon_stack.yaml` ("Web editor"), or point the repo's
    Git provider at this repository with `samjon_stack.yaml` as the stack file.
-3. Provide the secret variables (Portal username/password, API tokens) in the
-   stack's "Environment variables" field.
-4. Deploy. Data persists in the `samjon_memory_data` volume.
+3. Set the absolute bind paths (edit the placeholders above) and provide the
+   secret variables in the stack's "Environment variables" field.
+4. Deploy. Runtime data persists under the host paths you chose.
 
 ## Troubleshooting
 
+- **`Samjon data directory is not writable`** on startup: the host bind mount
+  `./data` is not writable by the container user. On Linux run
+  `sudo chown -R 10001:10001 ./data` (see Persistence). On Windows Docker
+  Desktop this is normally automatic.
 - **Container unhealthy / restarting:** check logs (`docker-logs.ps1`). `/health`
   returns `degraded` if Core cannot open its database.
 - **Portal returns 401:** Portal credentials are not set (or wrong) - set
   `SAMJON_PORTAL_USERNAME`/`SAMJON_PORTAL_PASSWORD` and restart.
-- **``unable to open database file``:** `/app/data` is unwritable. If you use a
-  bind mount instead of the named volume, fix the host directory ownership
-  (uid `10001`) - see Persistence above.
 - **Host port 8100 busy:** change `SAMJON_CORE_PORT` in `.env` (Compose publishes
   that host port to container `8100`).
 - **Templates or static assets missing:** the image was built from an older
-  wheel; rebuild with `docker compose up -d --build` after updating
-  `[tool.setuptools.package-data]` in `pyproject.toml`.
+  wheel; rebuild with `docker compose up -d --build` after updating the package
+  data config (`MANIFEST.in`) in `pyproject.toml`.
 
 ## Design decisions
 
+- **Bind mounts instead of a named volume:** host-visible data (`./data`,
+  `./category-covers`) for easy backup, inspection, and cover replacement.
 - **Multi-stage build** keeps the runtime image small (only the venv is copied;
   no tests, no `.git`, no source tree, no `data/`).
-- **No shell entrypoint** is used: migrations start automatically, and the named
-  volume preserves image directory ownership, so no privileged "fix up
-  permissions then drop" step is required.
+- **No shell entrypoint** is used for privilege dropping or migrations: migrations
+  run automatically, and the startup writeability check surfaces permission
+  problems clearly without recursive host `chown` from a privileged step.
 - **Single Uvicorn worker**: SQLite benefits from a single writer; there is no
   proven multi-worker evidence, so the image uses one worker and no `--reload`.
 - **Jinja2 + Pillow** are explicit runtime dependencies in `pyproject.toml`;
-  templates and Portal static assets are shipped in the wheel via
-  `[tool.setuptools.package-data]`.
+  templates and Portal static assets are shipped in the wheel via `MANIFEST.in`.

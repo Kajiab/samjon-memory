@@ -34,6 +34,12 @@ class CoreConfig:
     media_max_alt_text: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_ALT_TEXT", "500")))
     media_max_caption: int = field(default_factory=lambda: int(os.environ.get("SAMJON_MEDIA_MAX_CAPTION", "2000")))
 
+    # External category-cover directory. Empty (default) => packaged covers under
+    # portal/static/category-covers. When set (e.g. a Docker bind mount), configured
+    # covers are read from this directory instead so they can be replaced without
+    # rebuilding the image.
+    category_covers_root: str = field(default_factory=lambda: os.environ.get("SAMJON_CATEGORY_COVERS_ROOT", ""))
+
     @property
     def portal_username(self) -> str:
         return os.environ.get("SAMJON_PORTAL_USERNAME", "")

@@ -1,15 +1,16 @@
 # Samjon Memory - Portainer stack (Standalone / Docker).
 #
-# Deploy via Portainer > Stacks > Add stack > paste this file (or point at the
-# repo where Stack files = "samjon_stack.yaml"). Before deploying, set the
-# secret variables in Portainer's "Stack environment" (Visualizer then
-# "Environment variables"), or below. Do not commit secrets.
+# Deploy via Portainer > Stacks > Add stack > paste this file (or point the repo
+# where Stack files = "samjon_stack.yaml"). Bind mounts below use ABSOLUTE host
+# paths because Portainer treats relative bind paths ambiguously.
 #
-# Usage equivalent:
-#   docker compose -f samjon_stack.yaml up -d --build
+# EDIT THESE PATHS for your machine before deploying. The following are EXAMPLES
+# only (Windows-style shown; use POSIX paths on Linux):
+#   - "D:/HomeAssistant/samjon-memory/data:/app/data"
+#   - "D:/HomeAssistant/samjon-memory/category-covers:/app/category-covers:ro"
 #
-# Data persists in the named volume `samjon_memory_data` at /app/data and is
-# owned by the image's non-root `samjon` user.
+# Do not commit real secrets. Provide them via Portainer's stack "Environment
+# variables" (or a stack .env). Every bind source is an absolute placeholder.
 services:
   samjon-memory:
     build:
@@ -30,6 +31,7 @@ services:
       SAMJON_RESOLVER_DATABASE_PATH: "/app/data/samjon_resolver.sqlite"
       SAMJON_RESOLVER_FTS5_REQUIRED: "${SAMJON_RESOLVER_FTS5_REQUIRED:-true}"
       SAMJON_MEDIA_ROOT: "/app/data/media"
+      SAMJON_CATEGORY_COVERS_ROOT: "/app/category-covers"
       SAMJON_CORE_LOG_LEVEL: "${SAMJON_CORE_LOG_LEVEL:-INFO}"
       SAMJON_CORE_PORTAL_ENABLED: "true"
       SAMJON_CORE_CORS_ORIGINS: "${SAMJON_CORE_CORS_ORIGINS:-*}"
@@ -42,7 +44,13 @@ services:
       SAMJON_PORTAL_ALLOWED_ORIGINS: "${SAMJON_PORTAL_ALLOWED_ORIGINS:-http://localhost:8100,http://127.0.0.1:8100}"
       SAMJON_LIFECYCLE_AUTOMATIC_PURGE_ENABLED: "${SAMJON_LIFECYCLE_AUTOMATIC_PURGE_ENABLED:-false}"
     volumes:
-      - samjon_memory_data:/app/data
+      - type: bind
+        source: /absolute/path/to/samjon-memory/data
+        target: /app/data
+      - type: bind
+        source: /absolute/path/to/samjon-memory/category-covers
+        target: /app/category-covers
+        read_only: true
     healthcheck:
       test:
         - "CMD"
@@ -53,6 +61,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-
-volumes:
-  samjon_memory_data:

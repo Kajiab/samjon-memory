@@ -10,9 +10,11 @@ SQLite, repositories, CoreService, or the filesystem (other than the
 from __future__ import annotations
 
 import html as _html
+import os
 import re
 from pathlib import Path
 
+from samjon_memory.config import config
 from samjon_memory.constants import DEFAULT_PAGE_SIZE
 
 
@@ -290,7 +292,14 @@ CATEGORY_COVER_SUBDIR = "category-covers"
 
 
 def _category_covers_dir() -> Path:
-    """Directory holding configured category-cover assets (override in tests)."""
+    """Directory holding configured category-cover assets (override in tests).
+
+    Uses the external ``SAMJON_CATEGORY_COVERS_ROOT`` (a Docker bind mount) when
+    configured, otherwise the packaged ``portal/static/category-covers`` dir.
+    """
+    root = os.environ.get("SAMJON_CATEGORY_COVERS_ROOT", "") or config.category_covers_root
+    if root:
+        return Path(root)
     return Path(__file__).resolve().parent / "static" / CATEGORY_COVER_SUBDIR
 
 

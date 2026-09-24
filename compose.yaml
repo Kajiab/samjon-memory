@@ -1,13 +1,17 @@
 # Samjon Memory - local container deployment.
 #
+# Persistence: host-visible bind mounts, not a named volume.
+#   data/            -> /app/data          (Core/Resolver SQLite + media)
+#   category-covers/ -> /app/category-covers (read-only, replaceable covers)
+#
 # Usage:
 #   copy .env.docker.example -> .env   (set real secrets)
-#   docker compose up -d --build
+#   powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1
+#   (or: docker compose up -d --build)
 #
-# Data persistence: a named volume `samjon_memory_data` is mounted at
-# /app/data. A named volume survives container rebuilds and is owned by the
-# image's non-root `samjon` user, so no privileged entrypoint is required.
-# Core/Resolver migrations run automatically on startup.
+# Prior to first start, create the host directories (scripts/docker-up.ps1 does
+# this for you) so the container user (uid 10001) can write /app/data. See
+# docs/deployment/docker.md for Linux ownership requirements.
 services:
   samjon-memory:
     build:
@@ -27,7 +31,9 @@ services:
       SAMJON_CORE_PORT: "8100"
       SAMJON_CORE_DATABASE_PATH: "/app/data/samjon_core.sqlite"
       SAMJON_RESOLVER_DATABASE_PATH: "/app/data/samjon_resolver.sqlite"
-      # Writable secrets come from .env (compose interpolation), not from here.
+      SAMJON_MEDIA_ROOT: "/app/data/media"
+      SAMJON_CATEGORY_COVERS_ROOT: "/app/category-covers"
+      # Secrets come from .env (compose interpolation), not from here.
       SAMJON_CORE_SERVICE_TOKEN: "${SAMJON_CORE_SERVICE_TOKEN:-}"
       SAMJON_CORE_ADMIN_TOKEN: "${SAMJON_CORE_ADMIN_TOKEN:-}"
       SAMJON_CORE_READ_TOKEN: "${SAMJON_CORE_READ_TOKEN:-}"
@@ -39,14 +45,18 @@ services:
       SAMJON_CORE_PORTAL_ENABLED: "true"
       # Resolver
       SAMJON_RESOLVER_FTS5_REQUIRED: "${SAMJON_RESOLVER_FTS5_REQUIRED:-true}"
-      # Media
-      SAMJON_MEDIA_ROOT: "/app/data/media"
       # Lifecycle
       SAMJON_LIFECYCLE_AUTOMATIC_PURGE_ENABLED: "${SAMJON_LIFECYCLE_AUTOMATIC_PURGE_ENABLED:-false}"
       # Logging
       SAMJON_CORE_LOG_LEVEL: "${SAMJON_CORE_LOG_LEVEL:-INFO}"
     volumes:
-      - samjon_memory_data:/app/data
+      - type: bind
+        source: ./data
+        target: /app/data
+      - type: bind
+        source: ./category-covers
+        target: /app/category-covers
+        read_only: true
     healthcheck:
       test:
         - "CMD"
@@ -57,6 +67,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-
-volumes:
-  samjon_memory_data:

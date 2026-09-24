@@ -39,11 +39,29 @@ app.include_router(resolver_router)
 
 @app.on_event("startup")
 async def startup():
+    # Fail fast (clear logs, non-zero exit) when the bind-mounted data dirs are
+    # missing or unwritable. Enforced in production only (Docker sets ENV=production).
+    if not config.is_development:
+        from samjon_memory.core.startup import ensure_data_writeable
+        ensure_data_writeable(config.database_path, config.media_root)
     service = CoreService()
     app.state.service = service
 
 
 STATIC_DIR = Path(__file__).parent.parent / "portal" / "static"
+
+# When SAMJON_CATEGORY_COVERS_ROOT is configured (a Docker bind mount of host
+# ./category-covers), serve category covers from that directory so they can be
+# replaced without rebuilding the image. Registered before the general static
+# mount so this more-specific prefix wins; skipped if the directory is absent.
+if config.category_covers_root:
+    _ext_covers = Path(config.category_covers_root)
+    if _ext_covers.is_dir():
+        app.mount(
+            "/portal/static/category-covers",
+            StaticFiles(directory=str(_ext_covers)),
+            name="portal-category-covers",
+        )
 
 app.mount(
     "/portal/static",
