@@ -180,17 +180,19 @@ async def portal_memories(request: Request, _: str = Depends(portal_auth)):
         offset=offset,
     )
     message = _q(request, "message")
-    return HTMLResponse(content=pages.memory_list(
-        memories=memories, subject=subject or "", status_filter=status_filter,
-        scope=scope or "", offset=offset, message=message,
-    ))
+    return HTMLResponse(content=templating.render(
+        "memories/list.html", active="memories",
+        **viewmodels.memory_list_vm(memories, subject or "", status_filter,
+                                    scope, offset, message)))
 
 
 @router.get("/portal/memories/create", response_class=HTMLResponse)
 async def portal_memory_create_form(request: Request, _: str = Depends(portal_auth)):
     message = _q(request, "message")
     error = _q(request, "error")
-    return HTMLResponse(content=pages.memory_create_form(message=message, error=error))
+    return HTMLResponse(content=templating.render(
+        "memories/create.html", active="memories",
+        **viewmodels.memory_create_vm(message, error)))
 
 
 @router.post("/portal/memories", response_class=HTMLResponse)
@@ -211,7 +213,9 @@ async def portal_memory_create(request: Request, _: str = Depends(portal_auth)):
         mem = svc.create_memory(data, actor="portal")
         return RedirectResponse(url=f"/portal/memories/{mem['memory_id']}?message=created", status_code=303)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.memory_create_form(error=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render(
+            "memories/create.html", active="memories",
+            **viewmodels.memory_create_vm("", e.message)), status_code=e.status_code)
 
 
 @router.get("/portal/memories/{memory_id}", response_class=HTMLResponse)
@@ -220,10 +224,13 @@ async def portal_memory_detail(request: Request, memory_id: str, _: str = Depend
     try:
         memory = svc.get_memory(memory_id)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.error_page(message=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render("error.html", message=e.message),
+                            status_code=e.status_code)
     message = _q(request, "message")
     media = svc.list_media("memory", memory["memory_id"])
-    return HTMLResponse(content=pages.memory_detail(memory=memory, message=message, media=media))
+    return HTMLResponse(content=templating.render(
+        "memories/detail.html", active="memories",
+        **viewmodels.memory_detail_vm(memory, message, media)))
 
 
 @router.post("/portal/memories/{memory_id}/activate", response_class=HTMLResponse)
@@ -282,10 +289,13 @@ async def portal_memory_edit_form(request: Request, memory_id: str, _: str = Dep
     try:
         memory = svc.get_memory(memory_id)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.error_page(message=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render("error.html", message=e.message),
+                            status_code=e.status_code)
     message = _q(request, "message")
     error = _q(request, "error")
-    return HTMLResponse(content=pages.memory_edit_form(memory=memory, message=message, error=error))
+    return HTMLResponse(content=templating.render(
+        "memories/edit.html", active="memories",
+        **viewmodels.memory_edit_vm(memory, message, error)))
 
 
 @router.post("/portal/memories/{memory_id}", response_class=HTMLResponse)
@@ -311,13 +321,21 @@ async def portal_memory_edit(request: Request, memory_id: str, _: str = Depends(
                 mem = svc.get_memory(memory_id)
             except SamjonMemoryError:
                 mem = None
-            return HTMLResponse(content=pages.memory_edit_form(memory=mem, error="Version conflict: the memory was modified by another request. Please review and resubmit."), status_code=409)
+            return HTMLResponse(content=templating.render(
+                "memories/edit.html", active="memories",
+                **viewmodels.memory_edit_vm(
+                    mem, "",
+                    "Version conflict: the memory was modified by another request. "
+                    "Please review and resubmit.")), status_code=409)
         try:
             mem = svc.get_memory(memory_id)
         except SamjonMemoryError:
             mem = None
         error_msg = e.message if isinstance(e, SamjonMemoryError) else str(e)
-        return HTMLResponse(content=pages.memory_edit_form(memory=mem, error=error_msg), status_code=400 if isinstance(e, ValueError) else e.status_code)
+        return HTMLResponse(content=templating.render(
+            "memories/edit.html", active="memories",
+            **viewmodels.memory_edit_vm(mem, "", error_msg)),
+            status_code=400 if isinstance(e, ValueError) else e.status_code)
 
 
 @router.post("/portal/memories/{memory_id}/supersede", response_class=HTMLResponse)
@@ -334,9 +352,11 @@ async def portal_memory_supersede(request: Request, memory_id: str, _: str = Dep
             memory = svc.get_memory(memory_id)
         except SamjonMemoryError:
             memory = None
-        return HTMLResponse(content=pages.memory_detail(
-            memory=memory, message=e.message,
-            media=(svc.list_media("memory", memory["memory_id"]) if memory else [])),
+        return HTMLResponse(content=templating.render(
+            "memories/detail.html", active="memories",
+            **viewmodels.memory_detail_vm(
+                memory, e.message,
+                (svc.list_media("memory", memory["memory_id"]) if memory else []))),
             status_code=e.status_code)
 
 
@@ -352,9 +372,11 @@ async def portal_memory_forget(request: Request, memory_id: str, _: str = Depend
             memory = svc.get_memory(memory_id)
         except SamjonMemoryError:
             memory = None
-        return HTMLResponse(content=pages.memory_detail(
-            memory=memory, message=e.message,
-            media=(svc.list_media("memory", memory["memory_id"]) if memory else [])),
+        return HTMLResponse(content=templating.render(
+            "memories/detail.html", active="memories",
+            **viewmodels.memory_detail_vm(
+                memory, e.message,
+                (svc.list_media("memory", memory["memory_id"]) if memory else []))),
             status_code=e.status_code)
 
 
@@ -365,16 +387,18 @@ async def portal_collections(request: Request, _: str = Depends(portal_auth)):
     invalid = _q(request, "invalid") in ("1", "true", "True", "on")
     collections = svc.list_collections(status=status or None, invalid=invalid, limit=100, offset=0)
     message = _q(request, "message")
-    return HTMLResponse(content=pages.collection_list(
-        collections=collections, message=message, status_filter=status, invalid=invalid,
-    ))
+    return HTMLResponse(content=templating.render(
+        "collections/list.html", active="collections",
+        **viewmodels.collection_list_vm(collections, message, status, invalid)))
 
 
 @router.get("/portal/collections/create", response_class=HTMLResponse)
 async def portal_collection_create_form(request: Request, _: str = Depends(portal_auth)):
     message = _q(request, "message")
     error = _q(request, "error")
-    return HTMLResponse(content=pages.collection_create_form(message=message, error=error))
+    return HTMLResponse(content=templating.render(
+        "collections/create.html", active="collections",
+        **viewmodels.collection_create_vm(message, error)))
 
 
 @router.post("/portal/collections", response_class=HTMLResponse)
@@ -392,7 +416,9 @@ async def portal_collection_create(request: Request, _: str = Depends(portal_aut
         coll = svc.create_collection(data, actor="portal")
         return RedirectResponse(url=f"/portal/collections/{coll['collection_id']}?message=created", status_code=303)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.collection_create_form(error=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render(
+            "collections/create.html", active="collections",
+            **viewmodels.collection_create_vm("", e.message)), status_code=e.status_code)
 
 
 @router.get("/portal/collections/{collection_id}", response_class=HTMLResponse)
@@ -401,7 +427,8 @@ async def portal_collection_detail(request: Request, collection_id: str, _: str 
     try:
         collection = svc.get_collection(collection_id)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.error_page(message=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render("error.html", message=e.message),
+                            status_code=e.status_code)
     memories = svc.get_collection_memories_all(collection_id)
     for _m in memories:
         try:
@@ -412,10 +439,10 @@ async def portal_collection_detail(request: Request, collection_id: str, _: str 
     message = _q(request, "message")
     reopened = svc.collection_was_reopened(collection_id)
     media = svc.list_media("collection", collection_id)
-    return HTMLResponse(content=pages.collection_detail(
-        collection=collection, memories=memories, validation=validation,
-        message=message, reopened=reopened, media=media,
-    ))
+    return HTMLResponse(content=templating.render(
+        "collections/detail.html", active="collections",
+        **viewmodels.collection_detail_vm(
+            collection, memories, validation, message, reopened, media)))
 
 
 @router.get("/portal/collections/{collection_id}/edit", response_class=HTMLResponse)
@@ -424,10 +451,13 @@ async def portal_collection_edit_form(request: Request, collection_id: str, _: s
     try:
         collection = svc.get_collection(collection_id)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.error_page(message=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render("error.html", message=e.message),
+                            status_code=e.status_code)
     message = _q(request, "message")
     error = _q(request, "error")
-    return HTMLResponse(content=pages.collection_edit_form(collection=collection, message=message, error=error))
+    return HTMLResponse(content=templating.render(
+        "collections/edit.html", active="collections",
+        **viewmodels.collection_edit_vm(collection, message, error)))
 
 
 @router.post("/portal/collections/{collection_id}", response_class=HTMLResponse)
@@ -450,11 +480,12 @@ async def portal_collection_edit(request: Request, collection_id: str, _: str = 
         except SamjonMemoryError:
             collection = None
         return HTMLResponse(
-            content=pages.collection_detail(
-                collection=collection, memories=[],
-                validation={"valid": True, "issues": [], "memory_count": 0},
-                message=e.message, media=(svc.list_media("collection", collection_id) if collection else []),
-            ),
+            content=templating.render(
+                "collections/detail.html", active="collections",
+                **viewmodels.collection_detail_vm(
+                    collection, [], {"valid": True, "issues": [], "memory_count": 0},
+                    e.message, False,
+                    (svc.list_media("collection", collection_id) if collection else []))),
             status_code=e.status_code,
         )
 

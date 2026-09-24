@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% import 'components/fields.html' as fm %}
+{% block content %}
+{% if not_found %}
+{% set message = 'This collection was not found.' %}
+{% set back_path = '/portal/collections' %}
+{% set back_label = 'Back to Collections' %}
+{% include "components/not_found.html" %}
+{% else %}
+<h1>Collection</h1>
+{% include "components/banner.html" %}
+{% if reopen_banner %}<div class="banner warning" role="status">This Collection was reopened for editing. Validate it again, then Activate to republish.</div>{% endif %}
+<p class="subtitle">{{ subtitle }} {% include "components/badge.html" %}</p>
+<dl class="detail">{% for f in fields %}<dt>{{ f.label }}</dt><dd>{% if f.pre %}<pre>{{ f.value }}</pre>{% else %}{{ f.value }}{% endif %}</dd>{% endfor %}</dl>
+{% set admin = media %}{% include "components/media_admin.html" %}
+<div class="btn-row"><a class="btn" href="{{ edit_path }}">Edit details</a><a class="btn btn-ghost" href="{{ list_path }}">All collections</a></div>
+<section class="card"><h2>Progress</h2>
+<div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ expected }}" aria-valuenow="{{ current }}" aria-label="Collection progress"><div class="fill {{ fill_class }}" style="width:{{ pct }}%"></div></div>
+<p class="progress-label">Expected Sections: {{ expected }} &middot; Current Sections: {{ current }} &middot; Missing Sections: {{ missing }}</p>
+<p class="progress-state{% if valid %} is-ok{% endif %}">Status: {{ 'Ready to activate' if valid else 'Not ready to activate' }}</p>
+{% if issues %}<div class="validation-card"><h3>What to fix</h3><ul class="issue-list">{% for i in issues %}<li class="issue">{{ i }}</li>{% endfor %}</ul></div>{% endif %}
+</section>
+<section class="card"><h2>Sections</h2>
+<div class="table-wrapper"><table>
+<thead><tr><th>#</th><th>Section</th><th>Status</th><th>Version</th><th>Actions</th></tr></thead>
+<tbody>
+{% if sections %}
+{% for s in sections %}
+<tr><td>{{ s.seq }}</td><td>{{ s.label }} <span class="mono">{{ s.mid }}</span></td><td><span class="badge {{ s.badge.status }}">{{ s.badge.label }}</span></td><td>{{ s.version }}</td><td class="section-controls">
+{% if s.controls.kind == 'purged' %}<span class="hint">purged</span>
+{% elif s.controls.kind == 'restore' %}<form method="post" action="{{ s.controls.action }}" onsubmit="return confirm('Restore this section to draft?')"><button type="submit" class="btn btn-xsmall">Restore</button></form>
+{% else %}<a class="btn btn-xsmall" href="{{ s.controls.edit_href }}">Edit</a><form method="post" action="{{ s.controls.up_action }}"><button type="submit" class="btn btn-xsmall"{% if s.controls.up_disabled %} disabled{% endif %} aria-label="Move {{ s.controls.aria_label }} up" title="Move up">Up</button></form><form method="post" action="{{ s.controls.down_action }}"><button type="submit" class="btn btn-xsmall"{% if s.controls.down_disabled %} disabled{% endif %} aria-label="Move {{ s.controls.aria_label }} down" title="Move down">Down</button></form><form method="post" action="{{ s.controls.forget_action }}" onsubmit="return confirm('Forget this section? This cannot be undone.')"><button type="submit" class="btn btn-xsmall btn-danger">Forget</button></form>
+{% endif %}
+</td></tr>
+{% if s.has_media %}
+<tr id="section-{{ s.mid }}" class="section-media-row"><td colspan="5">{% set admin = s.manager.admin %}<details class="section-media" data-section-media="1"><summary>จัดการรูปภาพของบท</summary>
+{% include "components/media_admin.html" %}
+<p><a class="btn btn-xsmall btn-ghost" href="/portal/memories/{{ s.mid }}">Open full Section page</a></p></details></td></tr>
+{% endif %}
+{% endfor %}
+{% else %}
+<tr><td colspan="5"><div class="empty-state"><p>No sections yet.</p><p>Add your first section below.</p></div></td></tr>
+{% endif %}
+</tbody>
+</table></div></section>
+{% if can_edit_sections %}
+<section class="card"><h2>Add Section</h2>
+<form method="post" action="{{ add_section_action }}"><fieldset><legend>New section</legend>
+{% for f in add_section_fields %}{% if f.kind == "textarea" %}{{ fm.textarea(f) }}{% else %}{{ fm.text(f) }}{% endif %}{% endfor %}
+<button type="submit" class="btn">Add Section</button></fieldset></form>
+<p class="hint">Each section becomes an independently editable memory in this collection.</p></section>
+{% endif %}
+{% if assembled %}
+<section class="assembled-preview"><h2>Assembled preview</h2><p class="hint">How the collection reads when the sections are joined in order.</p>
+{% for a in assembled %}<article class="preview-block"><h3>{{ a.title }}</h3><pre>{{ a.raw_content }}</pre></article>{% endfor %}
+</section>
+{% endif %}
+{% if is_purged %}<section class="card"><h2>Purged</h2><p class="hint">This record was permanently purged. Its content is gone and it cannot be restored, edited, activated, or reused.</p></section>{% endif %}
+{% if is_forgotten %}{% set restore_action = restore_action %}{% include "components/restore_purge.html" %}{% endif %}
+{% if not is_purged and not is_forgotten %}
+<section class="card"><h2>Activate</h2>
+<form method="post" action="{{ activate_action }}" onsubmit="return confirm('Publish this collection? It becomes available to search and read.')"><button type="submit"{% if activate_disabled %} disabled{% endif %}>Activate</button></form>
+{% if activate_disabled %}<p class="hint">Add all required sections so the collection can be activated.</p>{% endif %}
+</section>
+{% endif %}
+<p class="cancel"><a class="btn btn-ghost" href="/portal/collections">Back to Collections</a></p>
+{% endif %}
+{% endblock %}

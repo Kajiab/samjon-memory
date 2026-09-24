@@ -418,3 +418,381 @@ def collection_reader_vm(collection, sections, back=None, media=None) -> dict:
         ],
         "edit_link": f"/portal/collections/{cid}/edit",
     }
+
+
+# ---- Admin: field view models ----------------------------------------------
+
+def text_field_vm(name, label, value="", required=False, maxlen=None, placeholder="",
+                  helper="", type_="text") -> dict:
+    return {"kind": "text", "name": name, "label": label, "value": value,
+            "required": bool(required), "maxlen": maxlen,
+            "placeholder": placeholder, "helper": helper, "type": type_}
+
+
+def textarea_field_vm(name, label, value="", required=False, maxlen=None, rows=6,
+                      helper="") -> dict:
+    return {"kind": "textarea", "name": name, "label": label, "value": value,
+            "required": bool(required), "maxlen": maxlen, "rows": rows,
+            "helper": helper}
+
+
+def readonly_field_vm(label, value, helper="") -> dict:
+    return {"kind": "readonly", "label": label, "value": value, "helper": helper}
+
+
+# ---- Admin media -------------------------------------------------------------
+
+def media_admin_vm(media, entity_type, entity_id, back_target="") -> dict:
+    """Admin media-management area (gallery + upload form)."""
+    items = []
+    total = len(media or [])
+    for idx, m in enumerate(media or []):
+        items.append({
+            **media_item_vm(m),
+            "disabled_cover": bool(m.get("is_cover")),
+            "disabled_left": idx == 0,
+            "disabled_right": idx == total - 1,
+        })
+    return {
+        "cards": items,
+        "has_items": bool(items),
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "back_target": back_target,
+        "has_back": bool(back_target),
+    }
+
+
+def section_media_manager_vm(section, cid) -> dict:
+    mid = section["memory_id"]
+    back = f"/portal/collections/{cid}#section-{mid}"
+    return {
+        "mid": mid,
+        "back": back,
+        "admin": media_admin_vm(section.get("media") or [], "memory", mid, back),
+    }
+
+
+# ---- Admin: Memory pages ----------------------------------------------------
+
+def memory_list_vm(memories, subject="", status_filter="", scope="", offset=0,
+                   message="") -> dict:
+    status_opts = [{"value": v, "label": l, "selected": status_filter == v}
+                   for v, l in [("", "All statuses"), ("draft", "Draft"),
+                                ("active", "Active"), ("superseded", "Superseded"),
+                                ("forgotten", "Forgotten")]]
+    scope_opts = [{"value": v, "label": l, "selected": scope == v}
+                  for v, l in [("", "All memories"), ("standalone", "Standalone"),
+                               ("collection", "Collection sections"),
+                               ("active_knowledge", "Active knowledge")]]
+    q = f"subject={subject}&status={status_filter}&scope={scope}"
+    prev_offset = max(0, offset - pages.DEFAULT_PAGE_SIZE)
+    next_offset = offset + pages.DEFAULT_PAGE_SIZE
+    rows = [{
+        "memory_id": m["memory_id"],
+        "title": m.get("title") or m.get("subject") or "",
+        "subject": m.get("subject") or "",
+        "badge": status_badge_vm(m.get("status", "")),
+        "memory_type": m.get("memory_type", ""),
+        "scope": m.get("scope", ""),
+        "version": m.get("version", ""),
+    } for m in memories]
+    return {
+        "banner": banner_vm(message),
+        "count": len(memories),
+        "subject": subject, "status_opts": status_opts, "scope_opts": scope_opts,
+        "rows": rows,
+        "prev_href": f"/portal/memories?offset={prev_offset}&{q}" if offset > 0 else None,
+        "next_href": f"/portal/memories?offset={next_offset}&{q}",
+    }
+
+
+def memory_detail_vm(memory, message="", media=None) -> dict:
+    if not memory:
+        return {"not_found": True}
+    mid = memory["memory_id"]
+    fields = [{"label": label, "value": memory.get(key, ""),
+               "pre": key in ("raw_content", "structured_value_json")}
+              for key, label in pages._MEMORY_FIELDS if key in memory]
+    status = memory.get("status", "")
+    return {
+        "not_found": False,
+        "banner": banner_vm(message),
+        "subtitle": mid,
+        "badge": status_badge_vm(status),
+        "fields": fields,
+        "media": media_admin_vm(media, "memory", mid, ""),
+        "edit_enabled": not memory.get("purged_at"),
+        "is_purged": bool(memory.get("purged_at")),
+        "is_forgotten": status == "forgotten",
+        "show_activate": (not memory.get("purged_at")) and status != "forgotten" and status == "draft",
+        "show_supersede": (not memory.get("purged_at")) and status != "forgotten",
+        "show_forget": (not memory.get("purged_at")) and status != "forgotten",
+        "version": memory.get("version", ""),
+        "restore_action": f"/portal/memories/{mid}/restore",
+        "purge_action": f"/portal/memories/{mid}/purge",
+        "supersede_action": f"/portal/memories/{mid}/supersede",
+        "forget_action": f"/portal/memories/{mid}/forget",
+        "activate_action": f"/portal/memories/{mid}/activate",
+        "edit_path": f"/portal/memories/{mid}/edit",
+        "new_path": "/portal/memories/create",
+        "list_path": "/portal/memories",
+    }
+
+
+# -- ADMIN A --
+
+
+def memory_create_vm(message="", error="") -> dict:
+    prefill = error if isinstance(error, dict) else {}
+    err_text = error if isinstance(error, str) else ""
+    fields = [
+        text_field_vm("subject", "Subject", prefill.get("subject", ""), required=True,
+                      maxlen=500, placeholder="e.g. Living room lighting",
+                      helper="A short, memorable name for this memory."),
+        text_field_vm("memory_type", "Type", prefill.get("memory_type", "fact"),
+                      maxlen=100, helper="e.g. fact, note, preference."),
+        text_field_vm("scope", "Scope", prefill.get("scope", "household"), maxlen=100,
+                      helper="Where this memory applies, e.g. household."),
+        text_field_vm("title", "Title", prefill.get("title", ""), maxlen=500,
+                      helper="Optional short title."),
+        textarea_field_vm("raw_content", "Content", prefill.get("raw_content", ""),
+                          required=True, maxlen=16384, rows=8,
+                          helper="Required. The full text of the memory."),
+        text_field_vm("source", "Source", prefill.get("source", "portal"), maxlen=200),
+        text_field_vm("language", "Language", prefill.get("language", "en"),
+                      maxlen=10, helper="Language code, e.g. en, th."),
+    ]
+    return {
+        "banner": banner_vm(message),
+        "error_text": pages._friendly_error(err_text) if err_text else "",
+        "fields": fields,
+        "form_action": "/portal/memories",
+        "cancel_path": "/portal/memories",
+    }
+
+
+def memory_edit_vm(memory, message="", error="") -> dict:
+    if not memory:
+        return {"not_found": True}
+    prefill = error if isinstance(error, dict) else {}
+    err_text = error if isinstance(error, str) else ""
+    mid = memory["memory_id"]
+    is_section = bool(memory.get("collection_id"))
+    fields = []
+    if is_section:
+        fields.append(readonly_field_vm("Subject", memory.get("subject", ""),
+                                        "Inherited from the Collection; cannot be changed."))
+        fields.append(text_field_vm("memory_type", "Type",
+                                    prefill.get("memory_type", memory.get("memory_type", "fact")), maxlen=100))
+        fields.append(readonly_field_vm("Scope", memory.get("scope", ""),
+                                        "Inherited from the Collection; cannot be changed."))
+    else:
+        fields.append(text_field_vm("subject", "Subject",
+                                    prefill.get("subject", memory.get("subject", "")), required=True, maxlen=500))
+        fields.append(text_field_vm("memory_type", "Type",
+                                    prefill.get("memory_type", memory.get("memory_type", "fact")), maxlen=100))
+        fields.append(text_field_vm("scope", "Scope",
+                                    prefill.get("scope", memory.get("scope", "household")), maxlen=100))
+    fields += [
+        text_field_vm("title", "Title", prefill.get("title", memory.get("title", "")), maxlen=500),
+        textarea_field_vm("raw_content", "Content",
+                          prefill.get("raw_content", memory.get("raw_content", "")),
+                          required=True, maxlen=16384, rows=8),
+        text_field_vm("source", "Source", prefill.get("source", memory.get("source", "")), maxlen=200),
+        text_field_vm("language", "Language",
+                      prefill.get("language", memory.get("language", "en")), maxlen=10),
+    ]
+    return {
+        "not_found": False,
+        "banner": banner_vm(message),
+        "error_text": pages._friendly_error(err_text) if err_text else "",
+        "fields": fields,
+        "subtitle": mid,
+        "expected_version": memory.get("version", ""),
+        "form_action": f"/portal/memories/{mid}",
+        "cancel_path": f"/portal/memories/{mid}",
+    }
+
+
+# ---- Admin: Collection pages ------------------------------------------------
+
+def collection_list_vm(collections, message="", status_filter="", invalid=False) -> dict:
+    rows = [{
+        "collection_id": c["collection_id"],
+        "title": c.get("title") or c.get("subject") or "",
+        "subject": c.get("subject") or "",
+        "collection_type": c.get("collection_type", ""),
+        "badge": status_badge_vm(c.get("status", "")),
+        "version": c.get("version", ""),
+    } for c in collections]
+    filters = [
+        {"href": "/portal/collections", "label": "All",
+         "active": (not status_filter) and not invalid},
+        {"href": "/portal/collections?status=draft", "label": "Draft",
+         "active": status_filter == "draft" and not invalid},
+        {"href": "/portal/collections?status=active", "label": "Active",
+         "active": status_filter == "active" and not invalid},
+        {"href": "/portal/collections?invalid=1", "label": "Invalid",
+         "active": bool(invalid)},
+    ]
+    return {"banner": banner_vm(message), "rows": rows, "filters": filters,
+            "invalid": bool(invalid), "has_rows": bool(collections)}
+
+
+def collection_create_vm(message="", error="") -> dict:
+    prefill = error if isinstance(error, dict) else {}
+    err_text = error if isinstance(error, str) else ""
+    fields = [
+        text_field_vm("subject", "Subject", prefill.get("subject", ""), required=True,
+                      maxlen=500, placeholder="e.g. Garden care"),
+        text_field_vm("collection_type", "Type", prefill.get("collection_type", "fact"),
+                      maxlen=100),
+        text_field_vm("scope", "Scope", prefill.get("scope", "household"), maxlen=100),
+        text_field_vm("title", "Title", prefill.get("title", ""), required=True,
+                      maxlen=500, helper="A short name for the collection."),
+        textarea_field_vm("summary", "Summary", prefill.get("summary", ""), maxlen=8192,
+                          rows=4, helper="Optional overview of what the collection contains."),
+        text_field_vm("source", "Source", prefill.get("source", "portal"), maxlen=200),
+        text_field_vm("source_reference", "Source reference",
+                      prefill.get("source_reference", ""),
+                      helper="Optional reference, e.g. a book, page or person."),
+        text_field_vm("language", "Language", prefill.get("language", "en"), maxlen=10),
+        text_field_vm("expected_item_count", "Expected sections",
+                      prefill.get("expected_item_count", ""), type_="number",
+                      helper="How many sections you plan to add."),
+    ]
+    return {
+        "banner": banner_vm(message),
+        "error_text": pages._friendly_error(err_text) if err_text else "",
+        "fields": fields,
+        "form_action": "/portal/collections",
+        "cancel_path": "/portal/collections",
+    }
+
+
+def collection_edit_vm(collection, message="", error="") -> dict:
+    if not collection:
+        return {"not_found": True}
+    prefill = error if isinstance(error, dict) else {}
+    err_text = error if isinstance(error, str) else ""
+    cid = collection["collection_id"]
+    ev = str(collection.get("expected_item_count") or "")
+    fields = [
+        text_field_vm("subject", "Subject",
+                      prefill.get("subject", collection.get("subject", "")), required=True, maxlen=500),
+        text_field_vm("collection_type", "Type",
+                      prefill.get("collection_type", collection.get("collection_type", "fact")), maxlen=100),
+        text_field_vm("scope", "Scope",
+                      prefill.get("scope", collection.get("scope", "household")), maxlen=100),
+        text_field_vm("title", "Title",
+                      prefill.get("title", collection.get("title", "")), required=True, maxlen=500),
+        textarea_field_vm("summary", "Summary",
+                          prefill.get("summary", collection.get("summary", "")), maxlen=8192, rows=4),
+        text_field_vm("source", "Source",
+                      prefill.get("source", collection.get("source", "")), maxlen=200),
+        text_field_vm("source_reference", "Source reference",
+                      prefill.get("source_reference", collection.get("source_reference", ""))),
+        text_field_vm("language", "Language",
+                      prefill.get("language", collection.get("language", "en")), maxlen=10),
+        text_field_vm("expected_item_count", "Expected sections",
+                      prefill.get("expected_item_count", ev), type_="number"),
+    ]
+    return {
+        "not_found": False,
+        "banner": banner_vm(message),
+        "error_text": pages._friendly_error(err_text) if err_text else "",
+        "fields": fields,
+        "subtitle": cid,
+        "form_action": f"/portal/collections/{cid}",
+        "cancel_path": f"/portal/collections/{cid}",
+    }
+
+
+def collection_detail_vm(collection, memories, validation, message="", reopened=False,
+                         media=None) -> dict:
+    if not collection:
+        return {"not_found": True}
+    cid = collection["collection_id"]
+    fields = [{"label": label, "value": collection.get(key, ""),
+               "pre": key == "summary"}
+              for key, label in pages._COLLECTION_FIELDS if key in collection]
+    expected = collection.get("expected_item_count", 0) or 0
+    memories = memories or []
+    current = len(memories)
+    missing = max(0, expected - current)
+    valid = bool(validation.get("valid", False))
+    issues = validation.get("issues", []) or []
+    fill_class = "success" if valid else ("warning" if current > 0 else "error")
+    pct = 0 if expected == 0 else min(100, int(current / expected * 100))
+    sections = []
+    for i, m in enumerate(memories):
+        raw_mid = m["memory_id"]
+        label = m.get("title") or m.get("subject") or ""
+        up_disabled = i == 0
+        down_disabled = i == len(memories) - 1
+        if m.get("purged_at"):
+            controls = {"kind": "purged"}
+        elif m.get("status") == "forgotten":
+            controls = {"kind": "restore", "action": f"/portal/memories/{raw_mid}/restore"}
+        else:
+            controls = {
+                "kind": "edit",
+                "edit_href": f"/portal/memories/{raw_mid}/edit",
+                "up_action": f"/portal/collections/{cid}/memories/{raw_mid}/move-up",
+                "down_action": f"/portal/collections/{cid}/memories/{raw_mid}/move-down",
+                "forget_action": f"/portal/memories/{raw_mid}/forget",
+                "up_disabled": up_disabled, "down_disabled": down_disabled,
+                "aria_label": label,
+            }
+        sections.append({
+            "mid": raw_mid, "label": label, "seq": m.get("sequence_number", ""),
+            "badge": status_badge_vm(m.get("status", "")), "version": m.get("version", ""),
+            "controls": controls,
+            "has_media": "media" in m,
+            "manager": section_media_manager_vm(m, cid) if "media" in m else None,
+        })
+    status = collection.get("status", "")
+    is_purged = bool(collection.get("purged_at"))
+    is_forgotten = status == "forgotten"
+    can_edit_sections = not is_purged and not is_forgotten
+    add_section_fields = [
+        text_field_vm("title", "Section title", "", required=True, maxlen=500,
+                      placeholder="e.g. Overview"),
+        text_field_vm("memory_type", "Type", "fact", maxlen=100),
+        textarea_field_vm("raw_content", "Content", "", required=True, maxlen=16384, rows=6),
+        text_field_vm("structured_value", "Structured value (optional)",
+                      helper="Optional structured data, as text."),
+        text_field_vm("language", "Language", "en", maxlen=10),
+        text_field_vm("sequence_number", "Position", current + 1, type_="number"),
+    ]
+    ordered = sorted(memories, key=lambda x: (x.get("sequence_number") is None,
+                                              x.get("sequence_number") or 0))
+    assembled = [{"title": m.get("title") or m.get("subject") or "",
+                  "raw_content": m.get("raw_content", ""),
+                  "seq": m.get("sequence_number")} for m in ordered]
+    return {
+        "not_found": False,
+        "banner": banner_vm(message),
+        "reopen_banner": bool(reopened) and status == "draft",
+        "subtitle": cid,
+        "badge": status_badge_vm(status),
+        "fields": fields,
+        "media": media_admin_vm(media, "collection", cid, ""),
+        "edit_path": f"/portal/collections/{cid}/edit",
+        "list_path": "/portal/collections",
+        "expected": expected, "current": current, "missing": missing,
+        "valid": valid, "issues": issues, "fill_class": fill_class, "pct": pct,
+        "sections": sections, "has_sections": bool(sections),
+        "can_edit_sections": can_edit_sections,
+        "add_section_fields": add_section_fields,
+        "add_section_action": f"/portal/collections/{cid}/memories",
+        "assembled": assembled,
+        "activate_disabled": not valid,
+        "activate_action": f"/portal/collections/{cid}/activate",
+        "is_purged": is_purged,
+        "is_forgotten": is_forgotten,
+        "restore_action": f"/portal/collections/{cid}/restore",
+        "purge_action": f"/portal/collections/{cid}/purge",
+        "version": collection.get("version", ""),
+    }

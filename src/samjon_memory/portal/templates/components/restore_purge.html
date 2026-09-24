@@ -1,0 +1,6 @@
+<section class="card"><h2>Restore</h2>
+<p class="hint">Bring this record back to draft so it can be reused.</p>
+<form method="post" action="{{ restore_action }}" onsubmit="return confirm('Restore this record to draft?')"><button type="submit" class="btn">Restore</button></form></section>
+<section class="card card-danger"><h2>Purge</h2>
+<p class="hint">Permanently erases content. Administrator only; type PURGE to confirm.</p>
+<form method="post" action="{{ purge_action }}" onsubmit="return confirm('This permanently erases the content and cannot be undone. Type PURGE to confirm.')"><input type="hidden" name="expected_version" value="{{ version }}"/><label class="field"><span class="field-label">Type PURGE to confirm</span><input name="confirmation" autocomplete="off" placeholder="PURGE" required/></label><button type="submit" class="btn btn-danger">Purge</button></form></section>

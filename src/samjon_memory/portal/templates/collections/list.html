@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Collections</h1>
+{% include "components/banner.html" %}
+<div class="filter" role="group" aria-label="Collection filters">
+{% for f in filters %}<a class="btn btn-ghost{% if f.active %} active{% endif %}" href="{{ f.href }}"{% if f.active %} aria-current="true"{% endif %}>{{ f.label }}</a>{% endfor %}
+</div>
+{% if invalid %}<p class="hint">Showing collections that fail validation.</p>{% endif %}
+<div class="btn-row"><a class="btn" href="/portal/collections/create">Create Collection</a></div>
+{% if rows %}
+<div class="table-wrapper"><table>
+<thead><tr><th>ID</th><th>Title</th><th>Subject</th><th>Type</th><th>Status</th><th>Version</th></tr></thead>
+<tbody>{% for r in rows %}<tr><td><a class="mono" href="/portal/collections/{{ r.collection_id }}">{{ r.collection_id }}</a></td><td>{{ r.title }}</td><td class="cell-subject" title="{{ r.subject }}">{{ r.subject }}</td><td>{{ r.collection_type }}</td><td><span class="badge {{ r.badge.status }}">{{ r.badge.label }}</span></td><td>{{ r.version }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}
+<div class="empty-state"><p>No collections yet.</p><p>Group related memories into an ordered collection.</p><p><a class="btn" href="/portal/collections/create">Create Collection</a></p></div>
+{% endif %}
+{% endblock %}

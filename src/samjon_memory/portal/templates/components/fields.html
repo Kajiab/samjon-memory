@@ -1,0 +1,17 @@
+{% macro text(f) -%}
+<label class="field"><span class="field-label">{{ f.label }}{% if f.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</span>
+<input name="{{ f.name }}" type="{{ f.type }}" value="{{ f.value }}"{% if f.required %} required{% endif %}{% if f.maxlen %} maxlength="{{ f.maxlen }}"{% endif %}{% if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %}/>
+{% if f.helper %}<span class="hint">{{ f.helper }}</span>{% endif %}</label>
+{%- endmacro %}
+
+{% macro textarea(f) -%}
+<label class="field"><span class="field-label">{{ f.label }}{% if f.required %} <span class="req" aria-hidden="true">*</span>{% endif %}{% if f.maxlen %}<output class="counter" data-for="{{ f.name }}">{{ f.value|string|length }}</output>{% endif %}</span>
+<textarea name="{{ f.name }}" rows="{{ f.rows }}"{% if f.required %} required{% endif %}{% if f.maxlen %} maxlength="{{ f.maxlen }}"{% endif %}>{{ f.value }}</textarea>
+{% if f.helper %}<span class="hint">{{ f.helper }}</span>{% endif %}</label>
+{%- endmacro %}
+
+{% macro readonly(f) -%}
+<div class="field"><span class="field-label">{{ f.label }}</span>
+<p class="readonly-value">{{ f.value }}</p>
+{% if f.helper %}<span class="hint">{{ f.helper }}</span>{% endif %}</div>
+{%- endmacro %}

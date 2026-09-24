@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not_found %}
+{% set message %}{{ 'This memory was not found.' }}{% endset %}
+{% set back_path = '/portal/memories' %}
+{% set back_label = 'Back to Memories' %}
+{% include "components/not_found.html" %}
+{% else %}
+<h1>Memory</h1>
+{% include "components/banner.html" %}
+<p class="subtitle">{{ subtitle }} {% include "components/badge.html" %}</p>
+<dl class="detail">{% for f in fields %}<dt>{{ f.label }}</dt><dd>{% if f.pre %}<pre>{{ f.value }}</pre>{% else %}{{ f.value }}{% endif %}</dd>{% endfor %}</dl>
+{% set admin = media %}{% include "components/media_admin.html" %}
+<div class="btn-row">{% if edit_enabled %}<a class="btn" href="{{ edit_path }}">Edit</a>{% endif %}<a class="btn btn-ghost" href="{{ new_path }}">New</a><a class="btn btn-ghost" href="{{ list_path }}">List</a></div>
+{% if is_purged %}<section class="card"><h2>Purged</h2><p class="hint">This record was permanently purged. Its content is gone and it cannot be restored, edited, activated, or reused.</p></section>{% endif %}
+{% if is_forgotten %}{% include "components/restore_purge.html" %}{% endif %}
+{% if show_activate %}
+<section class="card"><h2>Activate</h2><p class="hint">Publish this memory so it becomes active and searchable.</p><form method="post" action="{{ activate_action }}" onsubmit="return confirm('Activate this memory? It becomes active.')"><input type="hidden" name="expected_version" value="{{ version }}"/><button type="submit" class="btn">Activate</button></form></section>
+{% endif %}
+{% if show_supersede %}
+<section class="card"><h2>Supersede</h2><p class="hint">Mark this memory as replaced by another, newer memory.</p><form method="post" action="{{ supersede_action }}" onsubmit="return confirm('Supersede this memory with the replacement? The current version is kept as superseded.')"><label class="field"><span class="field-label">Replacement memory ID <span class="req" aria-hidden="true">*</span></span><input name="replacement_memory_id" required placeholder="e.g. mem-1234"/><span class="hint">Use the ID of the memory that replaces this one.</span></label><button type="submit" class="btn">Supersede</button></form></section>
+{% endif %}
+{% if show_forget %}
+<section class="card card-danger"><h2>Forget</h2><p class="hint">Forgetting removes this memory from active use. This cannot be undone.</p><form method="post" action="{{ forget_action }}" onsubmit="return confirm('Forget this memory? This cannot be undone.')"><button type="submit" class="btn btn-danger">Forget</button></form></section>
+{% endif %}
+<p><a class="btn btn-ghost" href="/portal/memories">Back to Memories</a></p>
+{% endif %}
+{% endblock %}

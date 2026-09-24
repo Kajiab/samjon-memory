@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import 'components/fields.html' as fm %}
+{% block content %}
+{% if not_found %}
+{% set message = 'This memory was not found.' %}
+{% set back_path = '/portal/memories' %}
+{% set back_label = 'Back to Memories' %}
+{% include "components/not_found.html" %}
+{% else %}
+<h1>Edit Memory</h1>
+{% include "components/banner.html" %}
+{% if error_text %}<div class="banner error" role="alert">{{ error_text }}</div>{% endif %}
+<p class="subtitle">{{ subtitle }}</p>
+<form method="post" action="{{ form_action }}"><fieldset><legend>Edit memory</legend>
+<input type="hidden" name="expected_version" value="{{ expected_version }}"/>
+{% for f in fields %}{% if f.kind == "textarea" %}{{ fm.textarea(f) }}{% elif f.kind == "readonly" %}{{ fm.readonly(f) }}{% else %}{{ fm.text(f) }}{% endif %}{% endfor %}
+<button type="submit" class="btn">Update</button></fieldset></form>
+<p class="cancel"><a class="btn btn-ghost" href="{{ cancel_path }}">Cancel</a></p>
+{% endif %}
+{% endblock %}

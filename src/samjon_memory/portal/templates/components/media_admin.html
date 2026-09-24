@@ -1,0 +1,27 @@
+<section class="card media-section"><h2>Images</h2>
+<form method="post" action="/portal/media/upload" enctype="multipart/form-data" class="media-upload">
+{% if admin.has_back %}<input type="hidden" name="back" value="{{ admin.back_target }}"/>{% endif %}
+<input type="hidden" name="entity_type" value="{{ admin.entity_type }}"/>
+<input type="hidden" name="entity_id" value="{{ admin.entity_id }}"/>
+<input type="file" name="file" accept="image/jpeg,image/png,image/webp" required/>
+<input name="alt_text" placeholder="Alt text" maxlength="500" title="Short image description for accessibility."/>
+<input name="caption" placeholder="Caption" maxlength="2000" title="Optional caption shown under the image."/>
+<button type="submit" class="btn">Upload image</button></form>
+{% if admin.has_items %}
+<div class="media-gallery">
+{% for m in admin.cards %}
+<figure class="media-item"><img src="{{ m.thumb_url }}" alt="{{ m.alt }}">{% if m.caption %}<span class="cap">{{ m.caption }}</span>{% endif %}{% if m.alt %}<span class="alt">[alt: {{ m.alt }} ]</span>{% endif %}{% if m.is_cover %}<span class="badge active">Cover</span>{% endif %}
+<figcaption class="media-controls">
+<form method="post" action="/portal/media/{{ m.media_id }}/cover">{% if admin.has_back %}<input type="hidden" name="back" value="{{ admin.back_target }}"/>{% endif %}<button type="submit" class="btn btn-xsmall"{% if m.disabled_cover %} disabled{% endif %}>Cover</button></form>
+<form method="post" action="/portal/media/{{ m.media_id }}/move-left">{% if admin.has_back %}<input type="hidden" name="back" value="{{ admin.back_target }}"/>{% endif %}<button type="submit" class="btn btn-xsmall"{% if m.disabled_left %} disabled{% endif %}>&larr;</button></form>
+<form method="post" action="/portal/media/{{ m.media_id }}/move-right">{% if admin.has_back %}<input type="hidden" name="back" value="{{ admin.back_target }}"/>{% endif %}<button type="submit" class="btn btn-xsmall"{% if m.disabled_right %} disabled{% endif %}>&rarr;</button></form>
+<form method="post" action="/portal/media/{{ m.media_id }}/remove" onsubmit="return window.confirm('Remove this image?')">{% if admin.has_back %}<input type="hidden" name="back" value="{{ admin.back_target }}"/>{% endif %}<button type="submit" class="btn btn-xsmall btn-danger">Remove</button></form>
+<details class="media-edit"><summary>Edit</summary>
+<form method="post" action="/portal/media/{{ m.media_id }}/metadata">{% if admin.has_back %}<input type="hidden" name="back" value="{{ admin.back_target }}"/>{% endif %}<label>Alt text<input name="alt_text" value="{{ m.alt }}" maxlength="500" title="Short image description shown when the image cannot load (accessibility)."></label><label>Caption<input name="caption" value="{{ m.caption }}" maxlength="2000" title="Optional caption displayed under the image."></label><button type="submit" class="btn btn-xsmall">Save</button></form>
+<form method="post" action="/portal/media/{{ m.media_id }}/replace" enctype="multipart/form-data">{% if admin.has_back %}<input type="hidden" name="back" value="{{ admin.back_target }}"/>{% endif %}<label>Replace<input type="file" name="file" accept="image/jpeg,image/png,image/webp"></label><button type="submit" class="btn btn-xsmall">Replace</button></form>
+</details></figcaption>
+</figure>
+{% endfor %}
+</div>
+{% else %}<div class="empty-state"><p>No images yet.</p></div>{% endif %}
+</section>

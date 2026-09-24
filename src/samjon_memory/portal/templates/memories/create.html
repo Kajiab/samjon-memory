@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import 'components/fields.html' as fm %}
+{% block content %}
+{% if not_found %}
+{% set message = 'This memory was not found.' %}
+{% set back_path = '/portal/memories' %}
+{% set back_label = 'Back to Memories' %}
+{% include "components/not_found.html" %}
+{% else %}
+<h1>Create Memory</h1>
+{% include "components/banner.html" %}
+{% if error_text %}<div class="banner error" role="alert">{{ error_text }}</div>{% endif %}
+<form method="post" action="/portal/memories"><fieldset><legend>New memory</legend>
+{% for f in fields %}{% if f.kind == "textarea" %}{{ fm.textarea(f) }}{% else %}{{ fm.text(f) }}{% endif %}{% endfor %}
+<button type="submit" class="btn">Create</button></fieldset></form>
+<p class="cancel"><a class="btn btn-ghost" href="/portal/memories">Cancel</a></p>
+{% endif %}
+{% endblock %}
