@@ -1,0 +1,21 @@
+{% if resolver %}
+<section class="card"><h2>Search index (Resolver)</h2>
+<ul class="audit-mini">
+<li>Status: {% if resolver.state_ready %}<span class="badge active">ready</span>{% else %}<span class="badge draft">not ready</span>{% endif %} ({{ resolver.state }})</li>
+<li>Fresh: {{ resolver.fresh }} &middot; Stale: {{ resolver.stale }} &middot; Missing: {{ resolver.missing }} &middot; Orphaned: {{ resolver.orphaned }}</li>
+<li>Projection: collections {{ resolver.collections }} &middot; memories {{ resolver.memories }} &middot; sections {{ resolver.sections }}</li>
+<li>Last rebuild: {{ resolver.projected_at }}</li>
+<li>Active build ID: <span class="mono">{{ resolver.last_build }}</span></li>
+<li>Snapshot checksum: <span class="mono">{{ resolver.checksum_short }}</span></li>
+</ul>
+<h3>Guidance</h3><ul class="issue-list">
+<li>Changed one record - use Selective Rebuild (specify entity type + ID)</li>
+<li>Changed several records or you are not sure - use Full Rebuild</li>
+<li>The index is not refreshed automatically after Core edits - rebuild it manually</li>
+</ul>
+<div class="btn-row">
+<form method="post" action="{{ resolver.full_action }}"><label class="field"><span class="field-label">Type REBUILD to confirm</span><input name="confirmation" placeholder="REBUILD" required/></label><button type="submit" class="btn">Full Rebuild</button></form>
+<form method="post" action="{{ resolver.sel_action }}"><label class="field"><span class="field-label">Entity type</span><input name="entity_type" placeholder="memory or collection" required/></label><label class="field"><span class="field-label">Entity ID</span><input name="entity_id" placeholder="entity ID" required/></label><label class="field"><span class="field-label">Type REBUILD to confirm</span><input name="confirmation" placeholder="REBUILD" required/></label><button type="submit" class="btn">Selective Rebuild</button></form>
+<a class="btn btn-ghost" href="/portal/resolver/">Open Resolver Debug</a>
+</div></section>
+{% endif %}

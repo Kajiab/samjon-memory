@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Audit Log</h1>
+{% include "components/banner.html" %}
+{% if stats_items %}<section class="card"><h2>Statistics</h2><ul class="audit-mini">{% for s in stats_items %}<li><span class="badge">{{ s.action }}</span> <strong>{{ s.count }}</strong></li>{% endfor %}</ul></section>{% endif %}
+<form method="get" class="filter" action="/portal/audit">
+<input name="entity_id" value="{{ entity_id }}" placeholder="Entity ID"/>
+<input name="entity_type" value="{{ entity_type }}" placeholder="Entity type"/>
+<input name="action" value="{{ action }}" placeholder="Action"/>
+<input name="since" value="{{ since }}" placeholder="Since (ISO)"/>
+<input name="until" value="{{ until }}" placeholder="Until (ISO)"/>
+<button type="submit" class="btn btn-ghost">Filter</button></form>
+{% if has_rows %}
+<div class="table-wrapper"><table>
+<thead><tr><th>ID</th><th>Entity Type</th><th>Entity ID</th><th>Action</th><th>Actor</th><th>Created</th></tr></thead>
+<tbody>{% for r in rows %}<tr><td class="mono">{{ r.audit_id }}</td><td>{{ r.entity_type }}</td><td class="mono">{{ r.entity_id }}</td><td><span class="badge">{{ r.action }}</span></td><td>{{ r.actor }}</td><td>{{ r.created_at }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}
+<div class="empty-state"><p>No audit records to show.</p></div>
+{% endif %}
+<nav class="pagination" aria-label="Audit pagination">{% if prev_href %}<a class="btn btn-ghost" href="{{ prev_href }}">Previous</a>{% else %}<span class="btn btn-ghost disabled">Previous</span>{% endif %}{% if next_href %}<a class="btn btn-ghost" href="{{ next_href }}">Next</a>{% else %}<span class="btn btn-ghost disabled">Next</span>{% endif %}</nav>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Administration</h1>
+{% include "components/banner.html" %}
+<div class="stat-grid">
+{% for m in cards %}<a class="metric-link" href="{{ m.href }}"><span class="stat-value">{{ m.value }}</span><span class="stat-label">{{ m.label }}</span>{% if m.note %}<span class="stat-note">{{ m.note }}</span>{% endif %}</a>{% endfor %}
+</div>
+<p class="count">{{ counts_line }}</p>
+{% if audit_stats %}<section class="card"><h2>Audit statistics (by action)</h2><ul class="audit-mini">{% for s in audit_stats %}<li><span class="badge">{{ s.action }}</span> <strong>{{ s.count }}</strong></li>{% endfor %}</ul></section>{% endif %}
+{% include "components/resolver_controls.html" %}
+<section class="card"><h2>Forgotten memories</h2>{% set table = forgotten_memories %}{% include "components/forgotten_table.html" %}</section>
+<section class="card"><h2>Forgotten collections</h2>{% set table = forgotten_collections %}{% include "components/forgotten_table.html" %}</section>
+<section class="card"><h2>Ready to purge</h2>{% set table = ready %}{% include "components/forgotten_table.html" %}</section>
+<section class="card"><h2>Pending retention</h2>{% set table = pending %}{% include "components/forgotten_table.html" %}</section>
+<section class="card"><h2>Purged memories and collections</h2>{% set table = purged %}{% include "components/purged_table.html" %}</section>
+{% endblock %}

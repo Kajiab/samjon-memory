@@ -796,3 +796,181 @@ def collection_detail_vm(collection, memories, validation, message="", reopened=
         "purge_action": f"/portal/collections/{cid}/purge",
         "version": collection.get("version", ""),
     }
+
+
+# ---- Dashboard (Status) ------------------------------------------------------
+
+def metric_vm(href, value, label, note="") -> dict:
+    return {"href": href, "value": value, "label": label, "note": note}
+
+
+def dashboard_vm(stats, recent_audit, message="") -> dict:
+    memories = [
+        metric_vm("/portal/memories?scope=standalone", stats["standalone_total"],
+                  "Standalone Memories", "Memories that are not part of any collection."),
+        metric_vm("/portal/memories?scope=standalone&status=draft", stats["standalone_draft"],
+                  "Draft", "Standalone memories not yet activated."),
+        metric_vm("/portal/memories?scope=standalone&status=active", stats["standalone_active"],
+                  "Active", "Standalone memories that are active."),
+        metric_vm("/portal/memories?scope=standalone&status=superseded", stats["standalone_superseded"],
+                  "Superseded", "Standalone memories replaced by a newer one."),
+        metric_vm("/portal/memories?scope=standalone&status=forgotten", stats["standalone_forgotten"],
+                  "Forgotten", "Standalone memories marked forgotten."),
+    ]
+    collections = [
+        metric_vm("/portal/collections", stats["collections_total"],
+                  "Total Collections", "All collections of every status."),
+        metric_vm("/portal/collections?status=draft", stats["collections_draft"],
+                  "Draft", "Collections that are not yet activated."),
+        metric_vm("/portal/collections?status=active", stats["collections_active"],
+                  "Active", "Collections that are activated."),
+        metric_vm("/portal/memories?scope=collection", stats["collection_sections_total"],
+                  "Collection Sections", "Memories that belong to a collection."),
+        metric_vm("/portal/collections?invalid=1", stats["invalid_collections"],
+                  "Invalid Collections",
+                  "Collections that fail validation: missing expected sections, duplicate order, or a forgotten section."),
+    ]
+    system = [
+        metric_vm("/portal/memories", stats["total_facts"],
+                  "Total Facts", "Standalone memories + collection sections, all statuses."),
+        metric_vm("/portal/memories?scope=standalone", stats["standalone_total"],
+                  "Standalone Memories", "Memories that are not part of any collection."),
+        metric_vm("/portal/memories?scope=collection", stats["collection_sections_total"],
+                  "Collection Sections", "Memories that belong to a collection."),
+        metric_vm("/portal/memories?scope=active_knowledge", stats["active_knowledge"],
+                  "Active Knowledge",
+                  "Active standalone memories + active sections inside active collections."),
+    ]
+    recent = [
+        {"action": r.get("action", ""), "entity_type": r.get("entity_type", ""),
+         "entity_id": r.get("entity_id", ""), "created_at": r.get("created_at", "")}
+        for r in recent_audit
+    ]
+    return {"banner": banner_vm(message), "memories": memories,
+            "collections": collections, "system": system, "recent": recent}
+
+
+# ---- Audit -------------------------------------------------------------------
+
+def audit_vm(records, entity_id="", entity_type="", action="", since="", until="",
+             offset=0, page_size=20, count=0, message="", summary=None) -> dict:
+    rows = [
+        {"audit_id": r.get("audit_id", ""), "entity_type": r.get("entity_type", ""),
+         "entity_id": r.get("entity_id", ""), "action": r.get("action", ""),
+         "actor": r.get("actor", ""), "created_at": r.get("created_at", "")}
+        for r in records
+    ]
+    f = (f"entity_id={entity_id}&entity_type={entity_type}&action={action}"
+         f"&since={since}&until={until}")
+    prev_href = (f"/portal/audit?offset={max(0, offset - page_size)}&{f}"
+                 if offset > 0 else None)
+    next_href = (f"/portal/audit?offset={offset + page_size}&{f}"
+                 if offset + len(records) < count else None)
+    stats_items = [{"action": row["action"], "count": row["count"]}
+                   for row in (summary or [])]
+    return {
+        "banner": banner_vm(message),
+        "rows": rows, "has_rows": bool(records),
+        "stats_items": stats_items,
+        "entity_id": entity_id, "entity_type": entity_type, "action": action,
+        "since": since, "until": until,
+        "prev_href": prev_href, "next_href": next_href,
+    }
+
+
+# ---- Administration ----------------------------------------------------------
+
+def forgotten_table_vm(items) -> dict:
+    if not items:
+        return {"has": False, "rows": []}
+    rows = []
+    for it in items:
+        ty = it.get("entity_type")
+        prefix = "memories" if ty == "memory" else "collections"
+        eid = it["entity_id"]
+        days = it.get("days_remaining")
+        rows.append({
+            "entity_type": ty, "eid": eid,
+            "title": it.get("title") or it.get("subject") or eid,
+            "forgotten_at": it.get("forgotten_at", ""),
+            "purge_eligible_date": it.get("purge_eligible_date", ""),
+            "days_text": f"{days} days" if days not in (None, 0) else "",
+            "ready": it.get("purge_eligible", False),
+            "version": it.get("version", ""),
+            "restore_action": f"/portal/{prefix}/{eid}/restore",
+            "purge_action": f"/portal/{prefix}/{eid}/purge",
+        })
+    return {"has": True, "rows": rows}
+
+
+def purged_table_vm(stats) -> dict:
+    items = stats.get("purged_memories", []) + stats.get("purged_collections", [])
+    if not items:
+        return {"has": False, "rows": []}
+    rows = [
+        {"entity_type": it.get("entity_type", ""),
+         "title": it.get("title") or it.get("subject") or it.get("entity_id", ""),
+         "version": it.get("version", ""), "purged_at": it.get("purged_at", ""),
+         "purged_by": it.get("purged_by", "")}
+        for it in items
+    ]
+    return {"has": True, "rows": rows}
+
+
+def resolver_controls_vm(resolver) -> dict | None:
+    if not resolver:
+        return None
+    readiness = resolver.get("readiness") or {}
+    state = readiness.get("status", "not_ready")
+    fs = resolver.get("freshness_summary") or {}
+    counts = resolver.get("counts") or {}
+    checksum = resolver.get("snapshot_checksum") or ""
+    return {
+        "state": state, "state_ready": state == "ok",
+        "fresh": fs.get("fresh", 0), "stale": fs.get("stale", 0),
+        "missing": fs.get("missing", 0), "orphaned": fs.get("orphaned", 0),
+        "collections": counts.get("collections", 0), "memories": counts.get("memories", 0),
+        "sections": counts.get("sections", 0),
+        "last_build": resolver.get("last_full_build_id") or "-",
+        "projected_at": resolver.get("projected_at") or "-",
+        "checksum_short": (checksum[:12] if checksum else "-"),
+        "full_action": "/portal/admin/resolver/rebuild",
+        "sel_action": "/portal/admin/resolver/rebuild/selective",
+    }
+
+
+def admin_vm(stats, message="", resolver=None) -> dict:
+    cards = [
+        metric_vm("/portal/admin", stats.get("schema_version", ""),
+                  "Core schema version", "Current schema version."),
+        metric_vm("/portal/admin", stats.get("database_status", "unknown"),
+                  "Database status", "Core database health."),
+        metric_vm("/portal/admin", stats.get("tombstone_count", 0),
+                  "Tombstones", "Purged identity records."),
+        metric_vm("/portal/admin", stats.get("audit_count", 0),
+                  "Audit rows", "Append-only lifecycle audit rows."),
+    ]
+    forgotten_memories = stats.get("forgotten_memories", [])
+    forgotten_collections = stats.get("forgotten_collections", [])
+    all_forgotten = forgotten_memories + forgotten_collections
+    ready = [it for it in all_forgotten if it.get("purge_eligible")]
+    pending = [it for it in all_forgotten if not it.get("purge_eligible")]
+    audit_stats = [{"action": row["action"], "count": row["count"]}
+                   for row in stats.get("audit_stats", [])]
+    counts_line = (
+        f"Forgotten memories: {len(forgotten_memories)} · "
+        f"Forgotten collections: {len(forgotten_collections)} · "
+        f"Ready to purge: {len(ready)} · Pending retention: {len(pending)}"
+    )
+    return {
+        "banner": banner_vm(message),
+        "cards": cards,
+        "counts_line": counts_line,
+        "audit_stats": audit_stats,
+        "forgotten_memories": forgotten_table_vm(forgotten_memories),
+        "forgotten_collections": forgotten_table_vm(forgotten_collections),
+        "ready": forgotten_table_vm(ready),
+        "pending": forgotten_table_vm(pending),
+        "purged": purged_table_vm(stats),
+        "resolver": resolver_controls_vm(resolver),
+    }

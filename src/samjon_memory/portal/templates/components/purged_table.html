@@ -1,0 +1,10 @@
+{% if table.has %}
+<div class="table-wrapper"><table>
+<thead><tr><th>Type</th><th>Title</th><th>Final version</th><th>Purged at</th><th>Purged by</th></tr></thead>
+<tbody>
+{% for r in table.rows %}
+<tr><td>{{ r.entity_type }}</td><td>{{ r.title }}</td><td>{{ r.version }}</td><td>{{ r.purged_at }}</td><td>{{ r.purged_by }}</td></tr>
+{% endfor %}
+</tbody>
+</table></div>
+{% else %}<div class="empty-state"><p>No purged records.</p></div>{% endif %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>System Status</h1>
+<p class="section-hint">สถานะ Core, Library และดัชนีการค้นหา</p>
+{% include "components/banner.html" %}
+<section class="card"><h2 class="metric-group-title">Memories</h2><div class="metric-grid">
+{% for m in memories %}<a class="metric-link" href="{{ m.href }}"><span class="stat-value">{{ m.value }}</span><span class="stat-label">{{ m.label }}</span>{% if m.note %}<span class="stat-note">{{ m.note }}</span>{% endif %}</a>{% endfor %}
+</div></section>
+<section class="card"><h2 class="metric-group-title">Collections</h2><div class="metric-grid">
+{% for m in collections %}<a class="metric-link" href="{{ m.href }}"><span class="stat-value">{{ m.value }}</span><span class="stat-label">{{ m.label }}</span>{% if m.note %}<span class="stat-note">{{ m.note }}</span>{% endif %}</a>{% endfor %}
+</div></section>
+<section class="card"><h2 class="metric-group-title">System Overview</h2><div class="metric-grid">
+{% for m in system %}<a class="metric-link" href="{{ m.href }}"><span class="stat-value">{{ m.value }}</span><span class="stat-label">{{ m.label }}</span>{% if m.note %}<span class="stat-note">{{ m.note }}</span>{% endif %}</a>{% endfor %}
+</div></section>
+<section class="card"><h2>Quick actions</h2>
+<div class="quick-actions">
+<a class="btn" href="/portal/memories/create">Create Memory</a>
+<a class="btn" href="/portal/collections/create">Create Collection</a>
+<a class="btn btn-ghost" href="/portal/memories">Browse Memories</a>
+<a class="btn btn-ghost" href="/portal/collections">Browse Collections</a>
+</div></section>
+<section class="card"><h2>Recent activity</h2>
+<ul class="audit-mini">{% if recent %}{% for r in recent %}<li><span class="badge">{{ r.action }}</span> {{ r.entity_type }} {{ r.entity_id }}<span class="when">{{ r.created_at }}</span></li>{% endfor %}{% else %}<li class="empty">No recent activity.</li>{% endif %}</ul></section>
+{% endblock %}

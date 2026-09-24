@@ -125,7 +125,9 @@ async def portal_status(request: Request, _: str = Depends(portal_auth)):
     stats = svc.dashboard_stats()
     recent = svc.get_audit_records(limit=8, offset=0)
     message = _q(request, "message")
-    return HTMLResponse(content=pages.dashboard(stats=stats, recent_audit=recent, message=message))
+    return HTMLResponse(content=templating.render(
+        "admin/status.html", active="status",
+        **viewmodels.dashboard_vm(stats, recent, message)))
 
 
 @router.get("/portal/library/subjects/{category_key}", response_class=HTMLResponse)
@@ -162,7 +164,9 @@ async def portal_admin(request: Request, _: str = Depends(portal_auth)):
     except Exception:
         resolver = {"status": "not_ready"}
     message = _q(request, "message")
-    return HTMLResponse(content=pages.admin_page(stats=stats, message=message, resolver=resolver))
+    return HTMLResponse(content=templating.render(
+        "admin/administration.html", active="admin",
+        **viewmodels.admin_vm(stats, message, resolver)))
 
 
 @router.get("/portal/memories", response_class=HTMLResponse)
@@ -630,12 +634,13 @@ async def portal_audit(request: Request, _: str = Depends(portal_auth)):
         since=since or None, until=until or None,
     )
     message = _q(request, "message")
-    return HTMLResponse(content=pages.audit_log(
-        records=records, entity_id=entity_id, entity_type=entity_type, action=action,
-        since=since, until=until, offset=offset, page_size=page_size,
-        count=offset + len(records) + (1 if len(records) == page_size else 0),
-        message=message, summary=summary,
-    ))
+    return HTMLResponse(content=templating.render(
+        "admin/audit.html", active="audit",
+        **viewmodels.audit_vm(
+            records=records, entity_id=entity_id, entity_type=entity_type, action=action,
+            since=since, until=until, offset=offset, page_size=page_size,
+            count=offset + len(records) + (1 if len(records) == page_size else 0),
+            message=message, summary=summary)))
 # ---- Resolver Search (user-facing) ----------------------------------------
 
 def _enrich_search_result(core, entry):

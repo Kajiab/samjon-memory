@@ -1,0 +1,10 @@
+{% if table.has %}
+<div class="table-wrapper"><table>
+<thead><tr><th>Type</th><th>Title</th><th>Forgotten at</th><th>Purge eligible</th><th>Days left</th><th>Readiness</th><th>Actions</th></tr></thead>
+<tbody>
+{% for r in table.rows %}
+<tr><td>{{ r.entity_type }}</td><td>{{ r.title }}</td><td>{{ r.forgotten_at }}</td><td>{{ r.purge_eligible_date }}</td><td>{{ r.days_text }}</td><td>{% if r.ready %}<span class="badge active">Ready</span>{% else %}<span class="badge draft">Pending</span>{% endif %}</td><td class="section-controls"><form method="post" action="{{ r.restore_action }}" onsubmit="return confirm('Restore this record to draft?')"><button type="submit" class="btn btn-xsmall">Restore</button></form>{% if r.ready %}<form method="post" action="{{ r.purge_action }}" onsubmit="return confirm('Type PURGE to confirm. This permanently erases content.')"><input type="hidden" name="expected_version" value="{{ r.version }}"/><input name="confirmation" placeholder="PURGE" required/><button type="submit" class="btn btn-xsmall btn-danger">Purge</button></form>{% else %}<button type="button" class="btn btn-xsmall btn-danger" disabled>Purge</button>{% endif %}</td></tr>
+{% endfor %}
+</tbody>
+</table></div>
+{% else %}<div class="empty-state"><p>None.</p></div>{% endif %}
