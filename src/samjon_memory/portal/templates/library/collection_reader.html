@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import 'components/cover.html' as cover %}
+{% block content %}
+<div class="reader-hero">{{ cover.frame(hero_cover) }}
+<div class="reader-hero-body">
+<h1>{{ title }}</h1>
+{% include "components/badge.html" %}
+{% if summary %}<p class="reader-summary">{{ summary }}</p>{% endif %}
+{% if meta %}<ul class="reader-meta">{% for item in meta %}<li class="reader-meta-item"><span class="reader-meta-k">{{ item.label }}</span><span class="reader-meta-v">{{ item.value }}</span></li>{% endfor %}</ul>{% endif %}
+<div class="reader-actions">{% if start_read %}<a class="btn" href="#chapter-1">เริ่มอ่าน</a>{% endif %}<a class="btn btn-ghost" href="#chapters">Contents</a>{% if back %}<a class="btn btn-ghost" href="{{ back }}">Back to results</a>{% endif %}</div>
+</div></div>
+<section class="reader-toc" id="chapters" aria-label="Table of contents"><h2>Chapters</h2>
+{% if toc %}<ol class="toc">{% for item in toc %}<li class="toc-item"><a href="#{{ item.id }}">{% if item.thumb %}<img class="toc-thumb" src="{{ item.thumb }}" alt="" loading="lazy">{% endif %}<span class="toc-number">{{ item.index }}.</span> {{ item.title }}</a></li>{% endfor %}</ol>{% endif %}
+</section>
+<section class="reader-content"><h2 class="visually-hidden">Chapters</h2>
+{% if chapters %}{% for chap in chapters %}{% include "components/reader_chapter.html" %}{% endfor %}{% else %}<div class="empty-state"><p>No chapters yet.</p></div>{% endif %}
+</section>
+{% include "components/technical_details_page.html" %}
+{% if edit_link %}<div class="btn-row reader-actions"><a class="btn btn-xsmall btn-ghost" href="{{ edit_link }}">Edit</a></div>{% endif %}
+{% endblock %}

@@ -77,9 +77,6 @@ def entity_cover_vm(entity) -> dict:
     return empty_cover_vm(title)
 
 
-# -- end of part 1 --
-
-
 def card_cover_vm(entry) -> dict:
     """Search-result/library cover from an enriched result entry."""
     thumb = entry.get("cover_thumb_url")
@@ -159,7 +156,67 @@ def library_card_vm(entity, entity_type: str) -> dict:
     }
 
 
-# -- end of part 2 --
+# ---- Reader view models -----------------------------------------------------
+
+def media_item_vm(m) -> dict:
+    """Read-only/media-admin item: id + authenticated thumb URL + safe text."""
+    return {
+        "media_id": m["media_id"],
+        "thumb_url": pages._media_thumb_url(m["media_id"]),
+        "alt": m.get("alt_text") or "",
+        "caption": m.get("caption") or "",
+        "is_cover": bool(m.get("is_cover")),
+    }
+
+
+def media_gallery_vm(media) -> list:
+    return [media_item_vm(m) for m in (media or [])]
+
+
+def reader_hero_cover_vm(media, fallback: str) -> dict:
+    """Reader hero cover frame (image) or an empty-cover placeholder."""
+    cov = pages.build_cover_vm(media)
+    if cov:
+        return media_frame_vm(wrapper="reader-hero-cover", img_class="reader-cover",
+                              src=cov["thumb_url"], alt=cov["alt"])
+    return empty_cover_vm(fallback, glyph=True)
+
+
+def _meta_item(label, value, href=None) -> dict:
+    return {"label": label, "value": value, "href": href or None}
+
+
+def memory_reader_vm(memory, back=None, collection_title="", media=None) -> dict:
+    mid = memory["memory_id"]
+    heading = memory.get("title") or memory.get("subject") or "Memory"
+    cat_name = pages._category_for_subject(memory.get("subject")).get("name") or ""
+    meta = []
+    for label, value in (("Subject", memory.get("subject") or ""),
+                         ("Category", cat_name),
+                         ("Type", memory.get("memory_type") or ""),
+                         ("Status", memory.get("status") or ""),
+                         ("Language", memory.get("language") or "")):
+        if value:
+            meta.append(_meta_item(label, value))
+    if collection_title and memory.get("collection_id"):
+        meta.append(_meta_item("Collection", collection_title,
+                               f"/portal/library/collections/{memory.get('collection_id')}"))
+    return {
+        "heading": heading,
+        "badge": status_badge_vm(memory.get("status") or ""),
+        "meta": meta,
+        "hero_cover": reader_hero_cover_vm(media, heading),
+        "raw_content": memory.get("raw_content", ""),
+        "media": media_gallery_vm(media),
+        "tech": [
+            {"label": "ID", "value": mid, "mono": True},
+            {"label": "Status", "value": memory.get("status") or "", "mono": False},
+            {"label": "Version", "value": memory.get("version") or "", "mono": False},
+            {"label": "Checksum", "value": memory.get("content_checksum") or "", "mono": True},
+        ],
+        "back": back,
+        "edit_link": f"/portal/memories/{mid}/edit",
+    }
 
 
 def technical_details_vm(entry) -> dict:
@@ -292,4 +349,72 @@ def search_vm(q, memories, collections, sections, stale=False, error="",
         "error": error,
         "groups": groups,
         "suggestion": suggestion,
+    }
+
+
+def _chapter_vm(sec, index: int) -> dict:
+    """One Collection Reader chapter (ordered section)."""
+    reader_link = f"/portal/library/memories/{sec.get('memory_id')}"
+    title = sec.get("title") or sec.get("subject") or f"Chapter {index}"
+    media = sec.get("media") or []
+    cover = next((m for m in media if m.get("is_cover")), (media[0] if media else None))
+    figures = [
+        {"src": pages._media_thumb_url(m["media_id"]), "alt": m.get("alt_text") or "",
+         "caption": m.get("caption") or ""}
+        for m in media
+    ]
+    return {
+        "id": f"chapter-{index}",
+        "number": index,
+        "title": title,
+        "reader_link": reader_link,
+        "cover": ({"src": pages._media_thumb_url(cover["media_id"]),
+                   "alt": cover.get("alt_text") or ""} if cover else None),
+        "figures": figures,
+        "raw_content": sec.get("raw_content", ""),
+    }
+
+
+def collection_reader_vm(collection, sections, back=None, media=None) -> dict:
+    cid = collection["collection_id"]
+    title = collection.get("title") or collection.get("subject") or "Collection"
+    ordered = sorted(sections or [], key=lambda s: s.get("sequence_number") or 0)
+    meta = []
+    if collection.get("subject"):
+        meta.append(_meta_item("Subject", collection["subject"]))
+    if collection.get("collection_type"):
+        meta.append(_meta_item("Type", collection["collection_type"]))
+    if collection.get("status"):
+        meta.append(_meta_item("Status", collection["status"]))
+    if collection.get("language"):
+        meta.append(_meta_item("Language", collection["language"]))
+    meta.append(_meta_item("Chapters", len(ordered)))
+    toc = []
+    for i, sec in enumerate(ordered, start=1):
+        smedia = sec.get("media") or []
+        scover = next((m for m in smedia if m.get("is_cover")), (smedia[0] if smedia else None))
+        toc.append({
+            "index": i,
+            "id": f"chapter-{i}",
+            "title": sec.get("title") or sec.get("subject") or f"Chapter {i}",
+            "thumb": pages._media_thumb_url(scover["media_id"]) if scover else None,
+        })
+    return {
+        "title": title,
+        "badge": status_badge_vm(collection.get("status") or ""),
+        "summary": collection.get("summary") or "",
+        "meta": meta,
+        "hero_cover": reader_hero_cover_vm(media, title),
+        "start_read": bool(ordered),
+        "back": back,
+        "toc": toc,
+        "chapters": [_chapter_vm(sec, i) for i, sec in enumerate(ordered, start=1)],
+        "has_chapters": bool(ordered),
+        "tech": [
+            {"label": "ID", "value": cid, "mono": True},
+            {"label": "Status", "value": collection.get("status") or "", "mono": False},
+            {"label": "Version", "value": collection.get("version") or "", "mono": False},
+            {"label": "Checksum", "value": collection.get("content_checksum") or "", "mono": True},
+        ],
+        "edit_link": f"/portal/collections/{cid}/edit",
     }

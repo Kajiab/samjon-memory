@@ -750,7 +750,8 @@ async def portal_library_memory(request: Request, memory_id: str, _: str = Depen
     try:
         memory = svc.get_memory(memory_id)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.error_page(message=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render("error.html", message=e.message),
+                            status_code=e.status_code)
     back = _q(request, "back", "/portal/search")
     collection_title = ""
     if memory.get("collection_id"):
@@ -760,7 +761,9 @@ async def portal_library_memory(request: Request, memory_id: str, _: str = Depen
         except Exception:
             collection_title = ""
     media = svc.list_media("memory", memory["memory_id"])
-    return HTMLResponse(content=pages.library_memory(memory=memory, back=back, collection_title=collection_title, media=media))
+    return HTMLResponse(content=templating.render(
+        "library/memory_reader.html", active="library",
+        **viewmodels.memory_reader_vm(memory, back, collection_title, media)))
 
 
 @router.get("/portal/library/collections/{collection_id}", response_class=HTMLResponse)
@@ -770,7 +773,8 @@ async def portal_library_collection(request: Request, collection_id: str, _: str
         collection = svc.get_collection(collection_id)
         sections = svc.get_collection_memories_all(collection_id)
     except SamjonMemoryError as e:
-        return HTMLResponse(content=pages.error_page(message=e.message), status_code=e.status_code)
+        return HTMLResponse(content=templating.render("error.html", message=e.message),
+                            status_code=e.status_code)
     back = _q(request, "back", "/portal/search")
     media = svc.list_media("collection", collection_id)
     for sec in sections:
@@ -778,7 +782,9 @@ async def portal_library_collection(request: Request, collection_id: str, _: str
             sec["media"] = svc.list_media("memory", sec["memory_id"])
         except Exception:
             sec["media"] = []
-    return HTMLResponse(content=pages.library_collection(collection=collection, sections=sections, back=back, media=media))
+    return HTMLResponse(content=templating.render(
+        "library/collection_reader.html", active="library",
+        **viewmodels.collection_reader_vm(collection, sections, back, media)))
 
 
 @router.post("/portal/admin/resolver/rebuild", response_class=HTMLResponse)

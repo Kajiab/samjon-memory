@@ -1,0 +1,4 @@
+{% if tech %}
+<details class="technical"><summary>Technical details</summary>
+<dl>{% for r in tech %}<dt>{{ r.label }}</dt><dd{% if r.mono %} class="mono"{% endif %}>{{ r.value }}</dd>{% endfor %}</dl></details>
+{% endif %}

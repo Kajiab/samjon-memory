@@ -1,0 +1,7 @@
+<section class="card media-section"><h2>Images</h2>
+{% if media %}
+<div class="media-gallery">
+{% for m in media %}<figure class="media-item"><img src="{{ m.thumb_url }}" alt="{{ m.alt }}">{% if m.caption %}<span class="cap">{{ m.caption }}</span>{% endif %}{% if m.alt %}<span class="alt">[alt: {{ m.alt }} ]</span>{% endif %}{% if m.is_cover %}<span class="badge active">Cover</span>{% endif %}</figure>{% endfor %}
+</div>
+{% else %}<div class="empty-state"><p>No images yet.</p></div>{% endif %}
+</section>

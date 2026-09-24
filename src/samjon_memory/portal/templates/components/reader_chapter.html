@@ -1,0 +1,7 @@
+<article class="chapter" id="{{ chap.id }}">
+<h3><span class="chapter-number">{{ chap.number }}.</span> <a href="{{ chap.reader_link }}">{{ chap.title }}</a></h3>
+{% if chap.cover %}<div class="chapter-cover-wrap"><img class="chapter-cover" src="{{ chap.cover.src }}" alt="{{ chap.cover.alt }}" loading="lazy"></div>{% endif %}
+{% if chap.figures %}<div class="chapter-gallery" aria-label="Section images">{% for f in chap.figures %}<figure class="reader-figure"><img src="{{ f.src }}" alt="{{ f.alt }}" loading="lazy">{% if f.caption %}<figcaption>{{ f.caption }}</figcaption>{% endif %}</figure>{% endfor %}</div>{% endif %}
+<div class="chapter-text"><pre>{{ chap.raw_content }}</pre></div>
+<p class="back-to-contents"><a href="#chapters">Back to contents</a></p>
+</article>

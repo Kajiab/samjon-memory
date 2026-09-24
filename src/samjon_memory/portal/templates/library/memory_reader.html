@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% import 'components/cover.html' as cover %}
+{% block content %}
+<div class="reader-hero">{{ cover.frame(hero_cover) }}
+<div class="reader-hero-body">
+<h1>{{ heading }}</h1>
+{% include "components/badge.html" %}
+{% if meta %}<ul class="reader-meta">{% for item in meta %}<li class="reader-meta-item"><span class="reader-meta-k">{{ item.label }}</span><span class="reader-meta-v">{% if item.href %}<a href="{{ item.href }}">{{ item.value }}</a>{% else %}{{ item.value }}{% endif %}</span></li>{% endfor %}</ul>{% endif %}
+</div></div>
+<section class="card reader-content"><h2 class="visually-hidden">Content</h2><pre class="reader-text">{{ raw_content }}</pre></section>
+{% if media %}{% include "components/media_gallery.html" %}{% endif %}
+{% include "components/technical_details_page.html" %}
+<div class="btn-row reader-actions">{% if back %}<a class="btn btn-ghost" href="{{ back }}">Back to results</a>{% endif %}{% if edit_link %}<a class="btn btn-xsmall btn-ghost" href="{{ edit_link }}">Edit</a>{% endif %}</div>
+{% endblock %}
