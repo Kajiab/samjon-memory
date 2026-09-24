@@ -1,0 +1,12 @@
+# Ship the Jinja2 templates and Portal static assets inside the wheel.
+# The application resolves these module-relative, so they must be present next
+# to the Python packages for the Docker image (and any installed deployment).
+include README.md
+
+# Jinja2 Portal templates (flat + all subdirectories)
+recursive-include src/samjon_memory/portal/templates *.html
+
+# Portal static assets (CSS, JS, and configured category covers)
+include src/samjon_memory/portal/static/portal.css
+include src/samjon_memory/portal/static/portal.js
+recursive-include src/samjon_memory/portal/static/category-covers *

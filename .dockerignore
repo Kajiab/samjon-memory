@@ -1,0 +1,42 @@
+# Version control
+.git
+.gitignore
+.gitkeep
+.agents
+.cursorrules
+
+# Local virtual environment & Python caches - never build into the image
+.venv
+__pycache__
+*.py[cod]
+*.egg-info
+
+# Test / dev artifacts - not part of the runtime image
+tests
+.pytest_cache
+.coverage
+htmlcov
+artifacts
+
+# Local runtime data (dev SQLite + media) - never baked into the image
+data
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.bak
+
+# Secrets - never copied into the build context
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Ad-hoc dev scripts at the repo root
+diagine_html2.py
+write_router.py
+
+# OS / IDE noise
+.DS_Store
+Thumbs.db
+.vscode
+.idea

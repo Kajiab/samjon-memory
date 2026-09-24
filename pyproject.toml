@@ -19,5 +19,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "httpx>=0.24.0"]
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["src"]

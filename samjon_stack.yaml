@@ -1,0 +1,58 @@
+# Samjon Memory - Portainer stack (Standalone / Docker).
+#
+# Deploy via Portainer > Stacks > Add stack > paste this file (or point at the
+# repo where Stack files = "samjon_stack.yaml"). Before deploying, set the
+# secret variables in Portainer's "Stack environment" (Visualizer then
+# "Environment variables"), or below. Do not commit secrets.
+#
+# Usage equivalent:
+#   docker compose -f samjon_stack.yaml up -d --build
+#
+# Data persists in the named volume `samjon_memory_data` at /app/data and is
+# owned by the image's non-root `samjon` user.
+services:
+  samjon-memory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: samjon-memory:local
+    container_name: samjon-memory
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${SAMJON_CORE_PORT:-8100}:8100"
+    environment:
+      SAMJON_CORE_ENV: "production"
+      SAMJON_CORE_HOST: "0.0.0.0"
+      SAMJON_CORE_PORT: "8100"
+      SAMJON_CORE_DATABASE_PATH: "/app/data/samjon_core.sqlite"
+      SAMJON_RESOLVER_DATABASE_PATH: "/app/data/samjon_resolver.sqlite"
+      SAMJON_RESOLVER_FTS5_REQUIRED: "${SAMJON_RESOLVER_FTS5_REQUIRED:-true}"
+      SAMJON_MEDIA_ROOT: "/app/data/media"
+      SAMJON_CORE_LOG_LEVEL: "${SAMJON_CORE_LOG_LEVEL:-INFO}"
+      SAMJON_CORE_PORTAL_ENABLED: "true"
+      SAMJON_CORE_CORS_ORIGINS: "${SAMJON_CORE_CORS_ORIGINS:-*}"
+      # Secrets: provide via Portainer stack environment (or a .env) - see docs.
+      SAMJON_CORE_SERVICE_TOKEN: "${SAMJON_CORE_SERVICE_TOKEN:-}"
+      SAMJON_CORE_ADMIN_TOKEN: "${SAMJON_CORE_ADMIN_TOKEN:-}"
+      SAMJON_CORE_READ_TOKEN: "${SAMJON_CORE_READ_TOKEN:-}"
+      SAMJON_PORTAL_USERNAME: "${SAMJON_PORTAL_USERNAME:-}"
+      SAMJON_PORTAL_PASSWORD: "${SAMJON_PORTAL_PASSWORD:-}"
+      SAMJON_PORTAL_ALLOWED_ORIGINS: "${SAMJON_PORTAL_ALLOWED_ORIGINS:-http://localhost:8100,http://127.0.0.1:8100}"
+      SAMJON_LIFECYCLE_AUTOMATIC_PURGE_ENABLED: "${SAMJON_LIFECYCLE_AUTOMATIC_PURGE_ENABLED:-false}"
+    volumes:
+      - samjon_memory_data:/app/data
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=3).status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  samjon_memory_data:
