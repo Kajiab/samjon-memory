@@ -88,7 +88,12 @@ from the Administration/Status operational surfaces.
   input + button, above the fold, stacks cleanly on mobile.
 - **Browse by Subject** — responsive shelf of the 12 subject categories, each a
   tile with English name, Thai hint, active Collection/Memory counts and a
-  representative cover when available.
+  cover resolved through a safe fallback chain: an explicitly configured
+  category cover (static asset under `portal/static/category-covers/`), else an
+  active Collection cover, else an active standalone Memory cover, else the
+  standard Library placeholder. Configured covers are presentation-only static
+  assets (safe-basename validated); they are not stored in Core, Resolver, or
+  the Media metadata table, and no Category entity is created.
 - **Discover** and **Recently Updated** — bounded cover-first card rows.
 - **Search results** — grouped Thai labels, 1-2 balanced cards per row on
   desktop, one card on tablet, cover-above-content on mobile.
