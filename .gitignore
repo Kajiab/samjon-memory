@@ -32,3 +32,10 @@ Thumbs.dbdata/
 *.bak
 *.egg-info/
 data/
+*.jpg
+*.webp
+
+# skill
+.Agents
+.cursorrules
+
