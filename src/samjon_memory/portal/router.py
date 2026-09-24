@@ -109,7 +109,7 @@ async def portal_index(request: Request, _: str = Depends(portal_auth)):
                     cover = svc._library_cover("memory", m)
                     break
         if cover:
-            cat["cover"] = cover
+            cat["entity_cover"] = cover
     discover = svc.library_discover(12)
     recent = svc.library_recent(8)
     return HTMLResponse(content=pages.library_home(
@@ -667,6 +667,8 @@ def _enrich_search_result(core, entry):
             entry["cover_thumb_source"] = (
                 "collection" if rt in ("collection", "collection_with_selected_memories") else "memory")
             entry["cover_alt"] = cover.get("alt_text") or cover.get("caption") or ""
+            entry["cover_width"] = cover.get("width")
+            entry["cover_height"] = cover.get("height")
         elif rt == "collection_memory" and entry.get("collection_id"):
             # Optional fallback: a Section without its own cover may use the
             # parent Collection cover as a visual placeholder (source marked).
@@ -678,6 +680,8 @@ def _enrich_search_result(core, entry):
                 entry["cover_thumb_url"] = pages._media_thumb_url(pcover["media_id"])
                 entry["cover_thumb_source"] = "collection_cover_fallback"
                 entry["cover_alt"] = pcover.get("alt_text") or pcover.get("caption") or ""
+                entry["cover_width"] = pcover.get("width")
+                entry["cover_height"] = pcover.get("height")
     except Exception:
         pass
     return entry

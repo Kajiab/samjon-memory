@@ -469,7 +469,7 @@ def test_search_home_and_results_use_reader_routes(client, temp_db, tmp_path):
     assert f'/portal/library/memories/{s["memory_id"]}' in body
     assert f'/portal/library/collections/{c["collection_id"]}' in body
     assert 'class="lib-card"' in body
-    assert "<details class=\"technical\">" in body
+    assert '<details class="technical result-action technical-action">' in body
 
 
 def test_memory_reader_hero_and_no_mutation(client, temp_db):
@@ -520,3 +520,135 @@ def test_library_pages_no_paths_binary_or_secrets(client, temp_db, tmp_path):
         for banned in ("relative_path", "thumbnail_path", "data:image",
                        "portal-secret", "portal-admin", "base64"):
             assert banned not in body, (p, banned)
+# ---------------------------------------------------------------------------
+# Configurable category covers (safe fallback chain)
+# ---------------------------------------------------------------------------
+
+def _cover_dir(tmp_path, name="cover.webp", data=b"x"):
+    d = tmp_path / "category-covers"
+    d.mkdir(exist_ok=True)
+    (d / name).write_bytes(data)
+    return d
+
+
+def test_category_catalog_keys_and_cover_config_stable():
+    import samjon_memory.portal.pages as pages
+    keys = [c["key"] for c in pages.SUBJECT_CATEGORIES]
+    assert keys == ["people", "household", "plants", "pets", "devices", "equipment",
+                    "locations", "music", "routines", "inventory", "systems", "other"]
+    for c in pages.SUBJECT_CATEGORIES:
+        assert c["name"] and c["hint"] and c["domains"] is not None
+        assert "cover" in c and "cover_alt" in c and "cover_position" in c
+
+
+def test_category_cover_configured_wins(tmp_path, monkeypatch):
+    import samjon_memory.portal.pages as pages
+    _cover_dir(tmp_path, "people.webp")
+    monkeypatch.setattr(pages, "_category_covers_dir", lambda: tmp_path / "category-covers")
+    cat = {**pages.category_by_key("people"),
+           "entity_cover": {"media_id": "m1", "alt_text": "entity alt"}}
+    html = pages._category_card(cat)
+    assert "/portal/static/category-covers/people.webp" in html
+    assert 'alt="People category"' in html
+    assert "object-position:" not in html          # center is the default: not emitted
+    assert "/portal/media/m1/thumb" not in html    # configured wins over entity
+
+
+def test_category_cover_position_applied(tmp_path, monkeypatch):
+    import samjon_memory.portal.pages as pages
+    _cover_dir(tmp_path, "pets.webp")
+    monkeypatch.setattr(pages, "_category_covers_dir", lambda: tmp_path / "category-covers")
+    cat = {**pages.category_by_key("pets"), "cover_position": "top"}
+    html = pages._category_card(cat)
+    assert "object-position: top;" in html
+
+
+def test_category_cover_missing_asset_falls_to_entity(tmp_path, monkeypatch):
+    import samjon_memory.portal.pages as pages
+    d = tmp_path / "category-covers"
+    d.mkdir()   # catalog names a cover, but the asset is absent -> safe fallback
+    monkeypatch.setattr(pages, "_category_covers_dir", lambda: d)
+    cat = {**pages.category_by_key("plants"),
+           "entity_cover": {"media_id": "m9", "alt_text": "a"}}
+    html = pages._category_card(cat)
+    assert "/portal/media/m9/thumb" in html
+    assert "/portal/static/category-covers/" not in html
+
+
+def test_category_cover_unsafe_path_ignored(tmp_path, monkeypatch):
+    import samjon_memory.portal.pages as pages
+    _cover_dir(tmp_path)
+    monkeypatch.setattr(pages, "_category_covers_dir", lambda: tmp_path / "category-covers")
+    cat = {**pages.category_by_key("devices"), "cover": "../../etc/passwd",
+           "entity_cover": {"media_id": "m3", "alt_text": "a"}}
+    html = pages._category_card(cat)
+    assert "/portal/static/category-covers/" not in html
+    assert "/portal/media/m3/thumb" in html
+
+
+def test_category_cover_placeholder_when_none(tmp_path, monkeypatch):
+    import samjon_memory.portal.pages as pages
+    d = tmp_path / "category-covers"
+    d.mkdir()
+    monkeypatch.setattr(pages, "_category_covers_dir", lambda: d)
+    cat = pages.category_by_key("music")   # no asset, no entity cover
+    html = pages._category_card(cat)
+    assert "lib-cover-placeholder" in html
+    assert "ยังไม่มีภาพปก" in html
+
+
+@pytest.mark.parametrize("fname", [
+    "people.webp", "people.jpg", "people.jpeg", "people.png",
+    "people.WEBP", "people.JPG", "people.PNG",
+])
+def test_category_cover_accepts_supported_extensions_case_insensitive(tmp_path, monkeypatch, fname):
+    """Configured covers support .webp/.jpg/.jpeg/.png (case-insensitive)."""
+    import samjon_memory.portal.pages as pages
+    d = tmp_path / "category-covers"
+    d.mkdir(exist_ok=True)
+    (d / fname).write_bytes(b"x")
+    monkeypatch.setattr(pages, "_category_covers_dir", lambda: d)
+    cat = {**pages.category_by_key("people"), "cover": fname,
+           "entity_cover": {"media_id": "m1", "alt_text": "alt"}}
+    html = pages._category_card(cat)
+    assert f"/portal/static/category-covers/{fname}" in html
+    assert f'/portal/static/category-covers/{fname.lower()}' in html.lower()
+    assert "/portal/media/m1/thumb" not in html  # configured wins over entity
+
+
+@pytest.mark.parametrize("bad", [
+    "people.svg", "people.gif", "people.bmp", "people.tiff",
+    "people", "webp", "people.webp/..", "a.png/../../x",
+])
+def test_category_cover_rejects_unsupported_or_unsafe(tmp_path, monkeypatch, bad):
+    """Non-enabled extensions / path-shaped values fall safely to entity cover."""
+    import samjon_memory.portal.pages as pages
+    d = tmp_path / "category-covers"
+    d.mkdir(exist_ok=True)
+    (d / "people.webp").write_bytes(b"x")
+    monkeypatch.setattr(pages, "_category_covers_dir", lambda: d)
+    cat = {**pages.category_by_key("people"), "cover": bad,
+           "entity_cover": {"media_id": "m3", "alt_text": "a"}}
+    html = pages._category_card(cat)
+    assert "/portal/static/category-covers/" not in html
+    assert "/portal/media/m3/thumb" in html
+
+
+def test_home_category_cover_collection_preferred_over_memory(client, temp_db, tmp_path):
+    import re as _re
+    from samjon_memory.core.service import CoreService
+    svc = CoreService(database_path=temp_db, media_root=str(tmp_path / "media"))
+    app.state.service = svc
+    coll = svc.create_collection({"subject": "plant:garden", "title": "Garden", "source": "t"})
+    svc.activate_collection(coll["collection_id"])
+    cbuf = _jpeg()
+    ccov = svc.upload_media("collection", coll["collection_id"], cbuf, alt_text="coll cover", actor="admin")
+    svc.set_media_cover(ccov["media_id"])
+    mem = svc.create_memory({"subject": "plant:rose", "title": "Rose", "raw_content": "c", "source": "t"})
+    svc.activate_memory(mem["memory_id"])
+    mbuf = _jpeg()
+    svc.upload_media("memory", mem["memory_id"], mbuf, alt_text="mem cover", actor="admin")
+    body = client.get("/portal/").text
+    # The Plants category card (lib-cat-cover-img) must use the Collection cover.
+    srcs = _re.findall(r'class="lib-cat-cover-img" src="([^"]+)"', body)
+    assert any(f"/portal/media/{ccov['media_id']}/thumb" in s for s in srcs)

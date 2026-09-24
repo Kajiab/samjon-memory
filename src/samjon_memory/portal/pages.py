@@ -6,6 +6,8 @@ This module only renders markup -- it never accesses SQLite or repositories.
 """
 
 import html as _html
+import re
+from pathlib import Path
 
 from samjon_memory.constants import DEFAULT_PAGE_SIZE
 
@@ -45,6 +47,26 @@ def _media_vm(m) -> dict:
     }
 
 
+def _orientation_class(width, height) -> str:
+    """Return a media-orientation CSS class from numeric width/height, or ''.
+
+    Classification: width < height -> portrait, > -> landscape, == -> square.
+    Returns '' when either dimension is missing/non-numeric so callers fall
+    back to the safe object-fit default (contain) instead of cropping blindly.
+    """
+    try:
+        w, h = int(width), int(height)
+    except (TypeError, ValueError):
+        return ""
+    if w <= 0 or h <= 0:
+        return ""
+    if w < h:
+        return "media-orientation-portrait"
+    if w > h:
+        return "media-orientation-landscape"
+    return "media-orientation-square"
+
+
 def build_gallery_vm(media) -> list:
     """Ordered gallery view model (display_order preserved from CoreService)."""
     return [_media_vm(m) for m in (media or [])]
@@ -66,18 +88,18 @@ def build_cover_vm(media):
 # individual subjects under one domain so new subject domains remain possible.
 
 SUBJECT_CATEGORIES = [
-    {"key": "people", "name": "People", "hint": "บุคคลและความชอบ", "domains": ["person"]},
-    {"key": "household", "name": "Household", "hint": "ข้อมูลที่ใช้ร่วมกันในบ้าน", "domains": ["household"]},
-    {"key": "plants", "name": "Plants", "hint": "ต้นไม้และการดูแล", "domains": ["plant"]},
-    {"key": "pets", "name": "Pets", "hint": "สัตว์เลี้ยงและการดูแล", "domains": ["pet"]},
-    {"key": "devices", "name": "Devices", "hint": "อุปกรณ์และเครื่องใช้", "domains": ["device"]},
-    {"key": "equipment", "name": "Equipment", "hint": "เครื่องมือและอุปกรณ์", "domains": ["equipment"]},
-    {"key": "locations", "name": "Locations", "hint": "ห้องและสถานที่", "domains": ["location"]},
-    {"key": "music", "name": "Music", "hint": "เพลงและความชอบด้านเสียง", "domains": ["music", "playlist"]},
-    {"key": "routines", "name": "Routines", "hint": "กิจวัตรและขั้นตอน", "domains": ["routine", "activity"]},
-    {"key": "inventory", "name": "Inventory", "hint": "สิ่งของและตำแหน่งจัดเก็บ", "domains": ["inventory", "item", "supply"]},
-    {"key": "systems", "name": "Systems", "hint": "ระบบ บริการ และ Automation", "domains": ["system", "service", "integration", "automation"]},
-    {"key": "other", "name": "Other", "hint": "ความรู้อื่น ๆ", "domains": []},
+    {"key": "people", "name": "People", "hint": "บุคคลและความชอบ", "domains": ["person"], "cover": "people.webp", "cover_alt": "People category", "cover_position": "center"},
+    {"key": "household", "name": "Household", "hint": "ข้อมูลที่ใช้ร่วมกันในบ้าน", "domains": ["household"], "cover": "household.webp", "cover_alt": "Household category", "cover_position": "center"},
+    {"key": "plants", "name": "Plants", "hint": "ต้นไม้และการดูแล", "domains": ["plant"], "cover": "plants.webp", "cover_alt": "Plants category", "cover_position": "center"},
+    {"key": "pets", "name": "Pets", "hint": "สัตว์เลี้ยงและการดูแล", "domains": ["pet"], "cover": "pets.webp", "cover_alt": "Pets category", "cover_position": "center"},
+    {"key": "devices", "name": "Devices", "hint": "อุปกรณ์และเครื่องใช้", "domains": ["device"], "cover": "devices.webp", "cover_alt": "Devices category", "cover_position": "center"},
+    {"key": "equipment", "name": "Equipment", "hint": "เครื่องมือและอุปกรณ์", "domains": ["equipment"], "cover": "equipment.webp", "cover_alt": "Equipment category", "cover_position": "center"},
+    {"key": "locations", "name": "Locations", "hint": "ห้องและสถานที่", "domains": ["location"], "cover": "locations.webp", "cover_alt": "Locations category", "cover_position": "center"},
+    {"key": "music", "name": "Music", "hint": "เพลงและความชอบด้านเสียง", "domains": ["music", "playlist"], "cover": "music.webp", "cover_alt": "Music category", "cover_position": "center"},
+    {"key": "routines", "name": "Routines", "hint": "กิจวัตรและขั้นตอน", "domains": ["routine", "activity"], "cover": "routines.webp", "cover_alt": "Routines category", "cover_position": "center"},
+    {"key": "inventory", "name": "Inventory", "hint": "สิ่งของและตำแหน่งจัดเก็บ", "domains": ["inventory", "item", "supply"], "cover": "inventory.webp", "cover_alt": "Inventory category", "cover_position": "center"},
+    {"key": "systems", "name": "Systems", "hint": "ระบบ บริการ และ Automation", "domains": ["system", "service", "integration", "automation"], "cover": "systems.webp", "cover_alt": "Systems category", "cover_position": "center"},
+    {"key": "other", "name": "Other", "hint": "ความรู้อื่น ๆ", "domains": [], "cover": "other.webp", "cover_alt": "Other category", "cover_position": "center"},
 ]
 
 _OTHER_CATEGORY = next(c for c in SUBJECT_CATEGORIES if c["key"] == "other")
@@ -151,7 +173,7 @@ def category_matches(category, subject) -> bool:
 
 
 def cover_thumb(media) -> str:
-    """Return a cover thumbnail <img> (or a placeholder) for a media list."""
+    """Return a cover thumbnail or a placeholder for a media list."""
     if not media:
         return '<div class="media-cover placeholder" aria-hidden="true">No cover</div>'
     cover = next((m for m in media if m.get("is_cover")), media[0])
@@ -328,10 +350,10 @@ def _brand_mark() -> str:
     """Drawn SVG book-spine mark (geometric, decorative, hidden from AT)."""
     return ('<svg class="nav-brand-mark" width="20" height="20" viewBox="0 0 20 20" '
             'aria-hidden="true" focusable="false">'
-            '<rect x="3" y="3" width="14" height="14" rx="2" fill="#146e6b"/>'
-            '<line x1="6" y1="6" x2="6" y2="15" stroke="#0f5c59" stroke-width="1.6"/>'
-            '<line x1="10" y1="6" x2="10" y2="15" stroke="#0f5c59" stroke-width="1.6"/>'
-            '<line x1="14" y1="6" x2="14" y2="15" stroke="#0f5c59" stroke-width="1.6"/>'
+            '<rect x="3" y="3" width="14" height="14" rx="2" fill="currentColor"/>'
+            '<line x1="6" y1="6" x2="6" y2="15" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.6"/>'
+            '<line x1="10" y1="6" x2="10" y2="15" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.6"/>'
+            '<line x1="14" y1="6" x2="14" y2="15" stroke="currentColor" stroke-opacity="0.7" stroke-width="1.6"/>'
             '</svg>')
 
 
@@ -498,7 +520,8 @@ def memory_list(memories, subject="", status_filter="", scope="", offset=0, mess
     if memories:
         rows = "".join(
             f'<tr><td><a class="mono" href="/portal/memories/{_e(m["memory_id"])}">{_e(m["memory_id"])}</a></td>'
-            f"<td>{_e(m['subject'])}</td>"
+            f'<td><a class="cell-primary-link" href="/portal/memories/{_e(m["memory_id"])}">{_e(m.get("title") or m.get("subject") or "")}</a></td>'
+            f'<td class="cell-subject" title="{_e(m.get("subject") or "")}">{_e(m.get("subject") or "")}</td>'
             f"<td>{_status_badge(m.get('status',''))}</td>"
             f"<td>{_e(m.get('memory_type',''))}</td>"
             f"<td>{_e(m.get('scope',''))}</td>"
@@ -506,7 +529,7 @@ def memory_list(memories, subject="", status_filter="", scope="", offset=0, mess
             for m in memories
         )
     else:
-        rows = ('<tr><td colspan="6"><div class="empty-state">'
+        rows = ('<tr><td colspan="7"><div class="empty-state">'
                 '<p>No memories found yet.</p>'
                 '<p>Create your first memory to get started.</p>'
                 '<p><a class="btn" href="/portal/memories/create">Create Memory</a></p>'
@@ -553,7 +576,7 @@ def memory_list(memories, subject="", status_filter="", scope="", offset=0, mess
         + f'<select name="scope">{scope_opts}</select>'
         + '<button type="submit" class="btn btn-ghost">Filter</button></form>'
         + '<div class="table-wrapper"><table>'
-        + '<thead><tr><th>ID</th><th>Subject</th><th>Status</th><th>Type</th><th>Scope</th><th>Version</th></tr></thead>'
+        + '<thead><tr><th>ID</th><th>Title</th><th>Subject</th><th>Status</th><th>Type</th><th>Scope</th><th>Version</th></tr></thead>'
         + f"<tbody>{rows}</tbody></table></div>"
         + pagination
     )
@@ -810,14 +833,15 @@ def collection_list(collections, message="", status_filter="", invalid=False) ->
     if collections:
         rows = "".join(
             f'<tr><td><a class="mono" href="/portal/collections/{_e(c["collection_id"])}">{_e(c["collection_id"])}</a></td>'
-            f"<td>{_e(c.get('title') or c.get('subject') or '')}</td>"
+            f'<td>{_e(c.get("title") or c.get("subject") or "")}</td>'
+            f'<td class="cell-subject" title="{_e(c.get("subject") or "")}">{_e(c.get("subject") or "")}</td>'
             f"<td>{_e(c.get('collection_type',''))}</td>"
             f"<td>{_status_badge(c.get('status',''))}</td>"
             f"<td>{_e(c.get('version',''))}</td></tr>"
             for c in collections
         )
     else:
-        rows = ('<tr><td colspan="5"><div class="empty-state">'
+        rows = ('<tr><td colspan="6"><div class="empty-state">'
                 '<p>No collections yet.</p>'
                 '<p>Group related memories into an ordered collection.</p>'
                 '<p><a class="btn" href="/portal/collections/create">Create Collection</a></p>'
@@ -830,7 +854,7 @@ def collection_list(collections, message="", status_filter="", invalid=False) ->
         + (('<p class="hint">Showing collections that fail validation.</p>') if invalid else "")
         + '<div class="btn-row"><a class="btn" href="/portal/collections/create">Create Collection</a></div>'
         + '<div class="table-wrapper"><table>'
-        + '<thead><tr><th>ID</th><th>Title</th><th>Type</th><th>Status</th><th>Version</th></tr></thead>'
+        + '<thead><tr><th>ID</th><th>Title</th><th>Subject</th><th>Type</th><th>Status</th><th>Version</th></tr></thead>'
         + f"<tbody>{rows}</tbody></table></div>"
     )
     return _page(body)
@@ -1177,7 +1201,8 @@ def _technical_details(entry) -> str:
         f"<dt>{_e(label)}</dt><dd class=\"mono\">{_e(value)}</dd>"
         for label, value in rows if value not in (None, "")
     )
-    return ('<details class="technical"><summary>รายละเอียดทางเทคนิค</summary>'
+    return ('<details class="technical result-action technical-action">'
+            '<summary>รายละเอียดทางเทคนิค</summary>'
             f"<dl>{inner}</dl></details>")
 
 
@@ -1229,7 +1254,10 @@ def _card_cover(entry) -> str:
              or entry.get("collection_title") or "")
     alt = _e(entry.get("cover_alt") or title)
     if thumb:
-        return ('<div class="lib-cover">'
+        orient = _orientation_class(entry.get("cover_width"), entry.get("cover_height"))
+        wrapper = ("lib-cover media-frame media-frame-cover"
+                   + (" " + orient if orient else ""))
+        return (f'<div class="{wrapper}">'
                 + f'<img class="lib-cover-img" src="{_e(thumb)}" alt="{alt}" loading="lazy">'
                 + "</div>")
     return _empty_cover(title)
@@ -1237,30 +1265,34 @@ def _card_cover(entry) -> str:
 
 def _result_card(entry, kind) -> str:
     kind_label = _RESULT_LABELS.get(kind, kind)
-    buttons = ""
+    primary = ""
+    secondary = ""
     count_html = ""
     if kind == "section":
         ctitle = entry.get("collection_title") or ""
         title = (f'{_e(ctitle)} › {_e(entry.get("title") or entry.get("subject") or "")}'
                  if ctitle else _e(entry.get("title") or entry.get("subject") or ""))
-        buttons = (
-            f'<a class="btn result-open" href="/portal/library/memories/{_e(entry.get("memory_id"))}">อ่านบทนี้</a>'
-            f'<a class="btn btn-ghost result-open" href="/portal/library/collections/{_e(entry.get("collection_id"))}">เปิดทั้งชุด</a>'
-        )
+        primary = (f'<a class="btn result-action result-action-primary result-open" '
+                   f'href="/portal/library/memories/{_e(entry.get("memory_id"))}">อ่านบทนี้</a>')
+        secondary = (f'<a class="btn btn-ghost result-action result-action-secondary result-open" '
+                     f'href="/portal/library/collections/{_e(entry.get("collection_id"))}">เปิดทั้งชุด</a>')
     elif kind == "collection":
         title = _e(entry.get("title") or entry.get("subject") or "")
         n = len(entry.get("selected_sections") or [])
         if n:
             count_html = f'<p class="lib-chapter-count">จำนวนบท {_e(n)}</p>'
-        buttons = f'<a class="btn result-open" href="/portal/library/collections/{_e(entry.get("collection_id"))}">เปิดชุดความรู้</a>'
+        primary = (f'<a class="btn result-action result-action-primary result-open" '
+                   f'href="/portal/library/collections/{_e(entry.get("collection_id"))}">เปิดชุดความรู้</a>')
     else:
         title = _e(entry.get("title") or entry.get("subject") or "")
-        buttons = f'<a class="btn result-open" href="/portal/library/memories/{_e(entry.get("memory_id"))}">อ่านบันทึก</a>'
+        primary = (f'<a class="btn result-action result-action-primary result-open" '
+                   f'href="/portal/library/memories/{_e(entry.get("memory_id"))}">อ่านบันทึก</a>')
     excerpt = _e(entry.get("excerpt") or "")
     excerpt_html = f'<p class="result-excerpt lib-excerpt">{excerpt}</p>' if excerpt else ""
     selected = (_selected_sections(entry)
                 if kind == "collection" and entry.get("selected_sections") else "")
     status_html = _status_badge(entry.get("status")) if entry.get("status") else ""
+    actions = f'<div class="result-actions">{primary}{secondary}{_technical_details(entry)}</div>'
     return (
         '<article class="lib-card">'
         + _card_cover(entry)
@@ -1271,9 +1303,8 @@ def _result_card(entry, kind) -> str:
         + excerpt_html
         + count_html
         + selected
-        + _technical_details(entry)
         + "</div>"
-        + f'<div class="lib-actions">{buttons}</div>'
+        + actions
         + "</article>"
     )
 
@@ -1303,7 +1334,7 @@ def search_page(q="", memories=None, collections=None, sections=None,
         '<p class="search-hint">พิมพ์คำหรือหัวข้อที่ต้องการค้นหา</p>'
         '<form method="post" action="/portal/search" class="search-form">'
         '<input type="hidden" name="target" value="auto"/>'
-        f'<input class="search-input" name="q" value="{_e(q)}" '
+        f'<input class="search-input" id="lib-search-q" name="q" value="{_e(q)}" aria-label="Search the knowledge library" '
         'placeholder="เช่น วิธีรดน้ำต้นไม้, การดูแลสวน" autofocus/>'
         '<button type="submit" class="btn search-btn">ค้นหา</button>'
         "</form>"
@@ -1340,7 +1371,7 @@ def _library_hero(q="") -> str:
         '<p class="search-hint">ค้นหาความรู้ที่บันทึกไว้ในบ้าน</p>'
         '<form method="post" action="/portal/search" class="search-form">'
         '<input type="hidden" name="target" value="auto"/>'
-        f'<input class="search-input" name="q" value="{_e(q)}" '
+        f'<input class="search-input" id="lib-search-q" name="q" value="{_e(q)}" aria-label="Search the knowledge library" '
         'placeholder="เช่น วิธีรดน้ำต้นไม้, การดูแลสวน" autofocus/>'
         '<button type="submit" class="btn search-btn">ค้นหา</button>'
         "</form>"
@@ -1355,18 +1386,114 @@ def _cat_counts(cat) -> str:
             f'{_e(cat.get("memories", 0))} \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01')
 
 
+# ---------------------------------------------------------------------------
+# Configurable category covers (presentation-only).
+#
+# Category cards resolve a representative cover via a safe fallback chain:
+#   1. an explicitly configured category cover (static asset, if present)
+#   2. an active Collection cover (attached to the category by the router)
+#   3. an active standalone Memory cover (attached by the router)
+#   4. the standard Library placeholder
+#
+# Configured covers are static assets under ``portal/static/category-covers/``.
+# They are NOT stored in Core, Resolver, or the Media metadata table, and
+# categories are presentation concepts -- no Category entity is created.
+# ---------------------------------------------------------------------------
+
+CATEGORY_COVER_SUBDIR = "category-covers"
+
+
+def _category_covers_dir() -> Path:
+    """Directory holding configured category-cover assets (override in tests)."""
+    return Path(__file__).resolve().parent / "static" / CATEGORY_COVER_SUBDIR
+
+
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _safe_cover_name(name) -> str:
+    """Return the configured filename only when it is a safe basename (no path)."""
+    if not name or not isinstance(name, str):
+        return ""
+    name = name.strip()
+    if "/" in name or "\\" in name or name in (".", ".."):
+        return ""
+    if not _SAFE_NAME_RE.fullmatch(name):
+        return ""
+    return name
+
+
+_ALLOWED_COVER_EXTS = {".webp", ".jpg", ".jpeg", ".png"}
+"""Enabled configured-cover image extensions (case-insensitive).
+
+SVG/other formats, remote URLs, absolute paths, traversal, and base64 are all
+rejected earlier by ``_safe_cover_name`` + this allowlist; assets still come only
+from ``portal/static/category-covers/``.
+"""
+
+
+def _safe_cover_position(position: str) -> str:
+    allowed = {"center", "top", "bottom", "left", "right",
+               "top left", "top right", "bottom left", "bottom right"}
+    p = (position or "center").strip().lower()
+    return p if p in allowed else "center"
+
+
+def _configured_category_cover(cat) -> dict:
+    """Configured category-cover view model, or {} when none is active.
+
+    A configured cover is active only when it names a safe basename whose asset
+    exists in the category-covers directory; otherwise the chain falls through.
+    """
+    raw = cat.get("cover") or ""
+    safe = _safe_cover_name(raw)
+    if not safe:
+        return {}
+    # Case-insensitive extension allowlist: .webp/.jpg/.jpeg/.png only.
+    if not any(safe.lower().endswith(ext) for ext in _ALLOWED_COVER_EXTS):
+        return {}
+    if not (_category_covers_dir() / safe).is_file():
+        return {}
+    alt = cat.get("cover_alt") or ((cat.get("name") or "Category") + " category")
+    return {
+        "url": f"/portal/static/{CATEGORY_COVER_SUBDIR}/{safe}",
+        "alt": alt,
+        "position": _safe_cover_position(cat.get("cover_position")),
+    }
+
+
+def _category_cover(cat) -> str:
+    """Render the best category cover for the fallback chain (module note).
+
+    ``entity_cover`` is already collection-preferred by the router: only set
+    when the category has no active configured cover.
+    """
+    conf = _configured_category_cover(cat)
+    if conf:
+        style = (f' style="object-position: {_e(conf["position"])};"'
+                 if conf["position"] != "center" else "")
+        # Configured covers are static assets without stored width/height, so
+        # they default to object-fit: contain (never cropped to a slim strip).
+        return ('<div class="lib-cat-cover media-frame media-frame-cover media-fit-contain">'
+                '<img class="lib-cat-cover-img" '
+                f'src="{_e(conf["url"])}" alt="{_e(conf["alt"])}" loading="lazy"{style}></div>')
+    cov = cat.get("entity_cover")
+    if cov and cov.get("media_id"):
+        alt = _e(cov.get("alt_text") or cov.get("caption") or "")
+        orient = _orientation_class(cov.get("width"), cov.get("height"))
+        wrapper = ("lib-cat-cover media-frame media-frame-cover"
+                   + (" " + orient if orient else ""))
+        return (f'<div class="{wrapper}"><img class="lib-cat-cover-img" '
+                f'src="{_media_thumb_url(cov["media_id"])}" alt="{alt}" loading="lazy"></div>')
+    return _empty_cover(cat.get("name") or "")
+
+
 def _category_card(cat) -> str:
     key = _e(cat.get("key") or "")
     name = _e(cat.get("name") or "")
     hint = _e(cat.get("hint") or "")
     counts = _cat_counts(cat)
-    cov = cat.get("cover")
-    if cov and cov.get("media_id"):
-        alt = _e(cov.get("alt_text") or cov.get("caption") or "")
-        cover = ('<div class="lib-cat-cover"><img class="lib-cat-cover-img" '
-                 f'src="{_media_thumb_url(cov["media_id"])}" alt="{alt}" loading="lazy"></div>')
-    else:
-        cover = _empty_cover(cat.get("name") or "")
+    cover = _category_cover(cat)
     return (
         f'<a class="lib-cat" href="/portal/library/subjects/{key}">'
         + cover
@@ -1391,8 +1518,11 @@ def _entity_cover(entity) -> str:
     cov = entity.get("cover")
     if cov and cov.get("media_id"):
         alt = _e(cov.get("alt_text") or cov.get("caption") or "")
-        return ('<div class="lib-cover"><img class="lib-cover-img" '
-                f'src="{_media_thumb_url(cov["media_id"])}" alt="{alt}"></div>')
+        orient = _orientation_class(cov.get("width"), cov.get("height"))
+        wrapper = ("lib-cover media-frame media-frame-cover"
+                   + (" " + orient if orient else ""))
+        return (f'<div class="{wrapper}"><img class="lib-cover-img" '
+                f'src="{_media_thumb_url(cov["media_id"])}" alt="{alt}" loading="lazy"></div>')
     title = entity.get("title") or entity.get("subject") or ""
     initial = _e(title[:1]) if title else "?"
     return ('<div class="lib-cover lib-cover-placeholder" aria-hidden="true">'
@@ -1472,10 +1602,10 @@ def category_page(category, collections, memories, offset=0, total=0, page_size=
     breadcrumb = f'<p class="breadcrumb"><a href="/portal/">Library</a> › <span>{name}</span></p>'
     blocks = ""
     if collections:
-        blocks += ('<h3 class="lib-cat-sub">ชุดความรู้</h3><div class="lib-card-grid">'
+        blocks += ('<h2 class="lib-cat-sub">ชุดความรู้</h2><div class="lib-card-grid">'
                    + "".join(library_card(c, "collection") for c in collections) + "</div>")
     if memories:
-        blocks += ('<h3 class="lib-cat-sub">บันทึกความรู้</h3><div class="lib-card-grid">'
+        blocks += ('<h2 class="lib-cat-sub">บันทึกความรู้</h2><div class="lib-card-grid">'
                    + "".join(library_card(m, "memory") for m in memories) + "</div>")
     if not blocks:
         blocks = '<div class="empty-state"><p>ยังไม่มีรายการในหมวดนี้</p></div>'
@@ -1521,7 +1651,7 @@ def library_memory(memory, back="/portal/search", collection_title="", media=Non
     cover_vm = build_cover_vm(media)
     if cover_vm:
         hero_cover = ('<div class="reader-hero-cover"><img class="reader-cover" '
-                      f'src="{_media_thumb_url(cover_vm["media_id"])}" alt="{_e(cover_vm.get("alt") or "")}"></div>')
+                      f'src="{_media_thumb_url(cover_vm["media_id"])}" alt="{_e(cover_vm.get("alt") or "")}" loading="lazy"></div>')
     else:
         hero_cover = _empty_cover(heading)
     gallery = _media_section(media) if media else ""
@@ -1561,7 +1691,7 @@ def _reader_chapter(sec, index) -> str:
     if cover:
         parts.append('<div class="chapter-cover-wrap"><img class="chapter-cover" src="'
                      + _media_thumb_url(cover["media_id"])
-                     + '" alt="' + _e(cover.get("alt_text") or "") + '"></div>')
+                     + '" alt="' + _e(cover.get("alt_text") or "") + '" loading="lazy"></div>')
     figs = []
     for m in media:
         alt = _e(m.get("alt_text") or "")
@@ -1611,7 +1741,7 @@ def library_collection(collection, sections, back="/portal/search", media=None) 
     cover_vm = build_cover_vm(media)
     if cover_vm:
         hero_cover = ('<div class="reader-hero-cover"><img class="reader-cover" '
-                      f'src="{_media_thumb_url(cover_vm["media_id"])}" alt="{_e(cover_vm.get("alt") or "")}"></div>')
+                      f'src="{_media_thumb_url(cover_vm["media_id"])}" alt="{_e(cover_vm.get("alt") or "")}" loading="lazy"></div>')
     else:
         hero_cover = _empty_cover(title)
     summary_html = (f'<p class="reader-summary">{_e(collection.get("summary") or "")}</p>'

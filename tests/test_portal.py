@@ -50,6 +50,22 @@ def test_memory_list_shows_created(client, temp_db):
     assert "listed memory" in resp.text
 
 
+def test_memory_list_renders_title_and_subject(client, temp_db):
+    """Memory list shows a human-readable Title (primary link) and the Subject."""
+    from samjon_memory.core.service import CoreService
+    svc = CoreService(database_path=temp_db)
+    app.state.service = svc
+    m = svc.create_memory({"subject": "plant:rose", "title": "Rose Care",
+                           "raw_content": "content", "source": "test"})
+    resp = client.get("/portal/memories")
+    body = resp.text
+    assert resp.status_code == 200
+    assert "Rose Care" in body                      # Title rendered
+    assert "plant:rose" in body                     # Subject rendered
+    assert f'href="/portal/memories/{m["memory_id"]}"' in body  # detail link intact
+    assert "&#39;" not in body.replace("&lt;", "").replace("&gt;", "")
+
+
 # ---- Memory detail ----
 
 def test_memory_detail(client, temp_db):
@@ -147,6 +163,20 @@ def test_collection_list_empty(client):
     resp = client.get("/portal/collections")
     assert resp.status_code == 200
     assert "Collections" in resp.text
+
+
+def test_collection_list_renders_subject(client, temp_db):
+    """Collection list shows the Subject column alongside Title."""
+    from samjon_memory.core.service import CoreService
+    svc = CoreService(database_path=temp_db)
+    app.state.service = svc
+    svc.create_collection({"subject": "plant:trees", "title": "Tree Guide", "source": "test"})
+    resp = client.get("/portal/collections")
+    body = resp.text
+    assert resp.status_code == 200
+    assert "Tree Guide" in body
+    assert "plant:trees" in body
+    assert "<th>Subject</th>" in body
 
 
 # ---- Collection create ----

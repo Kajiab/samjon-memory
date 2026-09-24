@@ -76,7 +76,7 @@ def test_search_returns_grouped_results(search_client, search_context):
     assert "Watering" in body                     # a section title
     assert "Garden Catalog › Watering" in body    # section shows collection / chapter
     assert 'class="lib-card"' in body
-    assert '<details class="technical">' in body  # technical details still in <details>
+    assert '<details class="technical result-action technical-action">' in body  # technical details still in <details>
     assert "รายละเอียดทางเทคนิค" in body
     assert "เปิดชุดความรู้" in body                 # Collection button
     assert f'href="/portal/library/memories/{search_context["s1"]}"' in body
