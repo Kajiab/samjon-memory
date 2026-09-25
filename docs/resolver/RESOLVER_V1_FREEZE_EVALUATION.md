@@ -17,7 +17,7 @@
   `test_resolver_search.py`, `test_resolver_selective.py`,
   `test_resolver_acceptance.py` — all pass.
 - OpenAPI drift: PASS.
-- Full suite: `python -m pytest tests/` -> **273 passed, 0 failed**.
+- Full suite: `python -m pytest tests/` -> **453 passed, 0 failed**.
 
 ## Resolver V1 Done Gates (AGENTS.md §32.2)
 
@@ -50,7 +50,7 @@
   projections (bounded, approved scope).
 - Neighbor context expansion is bounded and explicit; no automatic background
   rebuild jobs.
-- Embdeddings / vector search / AI enrichment / MCP / Numchoke are out of scope.
+- Embeddings / vector search / AI enrichment / MCP / Numchoke are out of scope.
 
 ## Recommendation
 
