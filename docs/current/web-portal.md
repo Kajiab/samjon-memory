@@ -52,9 +52,12 @@ Navigation (one unified navbar, `aria-current="page"`): **Library**, Memories, C
 
 ## 4. Portal Architecture
 
-- Uses CoreService application layer (not REST over HTTP)
+- Rendered from **Jinja2 templates** (`portal/templates/`), autoescaped; no
+  Python HTML-string renderers, no SPA
+- Uses CoreService application layer (not REST over HTTP); Resolver Debug pages
+  use ResolverService
 - No direct SQLite/repository/SQL access
-- XSS-safe rendering via html.escape
+- XSS-safe rendering via Jinja autoescape
 - Version conflict feedback on edit operations
 - Validation and activation feedback
 - Exact Origin validation for all mutations
@@ -64,9 +67,11 @@ Navigation (one unified navbar, `aria-current="page"`): **Library**, Memories, C
 
 ## 5. Boundary Rules
 
-- Portal handlers use CoreService only
+- Portal handlers use CoreService / ResolverService only
 - No direct database access
-- No Resolver/FTS5/embeddings/MCP code
+- No embeddings / vector search / AI enrichment / MCP code
+- The Resolver Debug Portal (`/portal/resolver/`) reuses Portal HTTP Basic +
+  exact Origin, uses ResolverService, and never writes to Core
 - Read/write permission separation via single admin account
 ## 6. Library Presentation (bookstore-style)
 
