@@ -10,10 +10,12 @@ Troubleshooting guide for Samjon Memory Core V1.
 
 ## 2. Common Issues
 
-- Migration required: run migrations (schema 1.1.0)
+- Migration required: run migrations (schema 1.2.0)
 - Database unavailable: check file permissions
 - Version conflict: check expected_version
 - Idempotency conflict: use different key
 - Sensitive data rejected: check input for credentials
 - Purge rejected: check the 30-day retention window, `PURGE` confirmation, and admin actor
 - Restore rejected: the record is purged (purged records cannot be restored)
+- Portal returns 401: Portal credentials not set/wrong (`SAMJON_PORTAL_USERNAME`/`SAMJON_PORTAL_PASSWORD`)
+- Docker data dir not writable: chown the host bind mount (`sudo chown -R 10001:10001 ./data` on Linux)
