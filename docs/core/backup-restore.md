@@ -17,7 +17,8 @@ Backup and restore for Samjon Memory Core V1.
 ## 3. Restore
 
 - Restore samjon_core.sqlite from backup
-- Validate schema version (1.1.0)
+- Also restore media files under `data/media/` (originals + thumbnails)
+- Validate schema version matches `CORE_SCHEMA_VERSION`
 - Run ensure_schema() if needed
 - Isolated restore test required
 
