@@ -1,13 +1,13 @@
 # Resolver Search, Ranking, and Freshness
 
 **Document ID:** SAMJON-RESOLVER-RANKING-001
-**Status:** PLANNED
+**Status:** PROVEN / IMPLEMENTED
 **Owner:** Samjon Memory Engineering
 **Approver:** Jeab
-**Last reviewed:** 2026-09-20
+**Last reviewed:** 2026-09-25
 
-> Foundations C1 and C2 (search, ranking, freshness, and bounded context
-> expansion) are implemented and tested; this document records the design/rules.
+> Search, ranking, freshness, and bounded context expansion are implemented
+> and tested; this document records the design/rules.
 
 ## 1. FTS5 Query Handling (Decision 10)
 
