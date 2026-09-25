@@ -37,6 +37,14 @@ Data model for Samjon Memory Core V1.
 ### lifecycle_tombstone
 - tombstone_id, entity_type, entity_id, final_version, content_checksum, purged_at, actor
 
+### media
+- media_id, entity_type ('memory'|'collection'), entity_id, relative_path,
+  thumbnail_path, mime_type (jpeg/png/webp), file_size, width, height,
+  alt_text, caption, display_order, is_cover, checksum,
+  lifecycle_status ('active'|'hidden'|'purged'), created_at, updated_at
+- Only one `is_cover=1` row per entity (enforced in the service)
+- Binary bytes and absolute filesystem paths are never stored
+
 ## 3. Constraints
 
 - raw_content <= 16384 chars
