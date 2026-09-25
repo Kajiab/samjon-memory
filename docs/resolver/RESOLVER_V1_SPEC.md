@@ -1,17 +1,19 @@
 # Resolver V1 Specification
 
 **Document ID:** SAMJON-RESOLVER-SPEC-001
-**Status:** PLANNED
+**Status:** PROVEN / IMPLEMENTED
 **Owner:** Samjon Memory Engineering
 **Approver:** Jeab
-**Last reviewed:** 2026-09-20
-**Depends on:** Core V1.1 frozen baseline (`docs/core/CORE_V1_FREEZE.md`)
-**Implementation status:** Foundations A, B, C1, C2, and D are implemented and tested. The Resolver Debug Portal is implemented; only MCP / Numchoke integration remains out of scope. See `RESOLVER_V1_FREEZE_EVALUATION.md` (all Resolver V1 freeze gates PASS -> READY_FOR_OWNER_APPROVAL).
+**Last reviewed:** 2026-09-25
+**Depends on:** Core frozen baseline (`docs/core/CORE_V1_FREEZE.md`)
+**Implementation status:** Implemented and tested — projection, FTS5 search,
+ranking, freshness, atomic + selective rebuild, and the Resolver Debug Portal.
+MCP / Numchoke integration remains a separate repository / work item. See
+`RESOLVER_V1_FREEZE_EVALUATION.md` (all Resolver V1 freeze gates PASS ->
+READY_FOR_OWNER_APPROVAL).
 
-> This is a planning document. No code, migrations, routes, Portal, or
-> capability changes are implemented in this task. Resolver status is
-> **PLANNED** and becomes `IMPLEMENTED` / `PROVEN` only after executable tests
-> pass (AGENTS.md §20, §30).
+> This document is the Resolver specification. Behavior is verified by
+> executable tests in `tests/`.
 
 ## 1. Purpose
 
@@ -21,7 +23,7 @@ boundary and searches them with FTS5.
 
 ## 2. Hard Constraints
 
-- Core (`samjon_core.sqlite`) is an authoritative, frozen baseline (schema `1.1.0`).
+- Core (`samjon_core.sqlite`) is an authoritative baseline (schema `1.2.0`).
 - Do not change Core schema, CoreService behavior, or Core API contracts.
 - Resolver (`samjon_resolver.sqlite`) is a separate database file, schema,
   migration set, repository, backup policy, and lifecycle.
