@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "samjon-memory"
 version = "1.0.0"
-description = "Samjon Memory Core Foundation V1 - Durable structured household knowledge backend"
+description = "Samjon Memory - local, durable household-knowledge backend for personal AI assistants (Core, Resolver, Media, Library, Portal, Docker)"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.100.0",
