@@ -1,6 +1,6 @@
 # Forget / Restore / Purge / Audit Retention — Design Spec
 
-**Status:** DRAFT — PENDING REVIEW (do not implement before approval)
+**Status:** HISTORICAL — implemented in Core schema 1.1.0 (design record; no longer a pending plan)
 **Document ID:** SAMJON-LIFECYCLE-001
 **Owner:** Samjon Memory Engineering
 
@@ -295,4 +295,5 @@ constants, services, routes, Portal, and docs remain as-is until review approval
 CoreService restore/purge + audit summary/filters, REST routes, Portal (Restore /
 Purge with `PURGE` confirmation, purged-inert UI, audit stats + pagination),
 OpenAPI regenerated, and acceptance tests in `tests/test_lifecycle.py` /
-`tests/test_migration.py`. Full suite: **144 passed**.
+`tests/test_migration.py`. Full suite at the time: **144 passed** (a prior
+milepost; the current suite is 453 passed).
