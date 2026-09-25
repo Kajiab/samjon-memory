@@ -1,12 +1,12 @@
 # Resolver Schema and Migrations
 
 **Document ID:** SAMJON-RESOLVER-SCHEMA-001
-**Status:** PLANNED
+**Status:** PROVEN / IMPLEMENTED
 **Owner:** Samjon Memory Engineering
 **Approver:** Jeab
-**Last reviewed:** 2026-09-20
+**Last reviewed:** 2026-09-25
 
-> Foundation A + B are implemented and tested for schema `1.1.0`; this
+> Implemented and tested for schema `1.1.0`; this
 > document records the design and guiding principles.
 
 ## 1. Principles
