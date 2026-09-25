@@ -1,39 +1,65 @@
 # Samjon Memory Status
 
 **Document ID:** SAMJON-MEMORY-STATUS-001
-**Version:** 2.1.0
+**Version:** 3.0.0
 **Status:** CANONICAL
 **Owner:** Samjon Memory Engineering
-**Last reviewed:** 2026-09-20
+**Last reviewed:** 2026-09-25
 
 ## Current Phase
 
-- Project status: Core V1 complete and verified
-- Current phase: Core V1 delivered, Resolver not started
-- Core database schema: 1.1.0
+The Samjon Memory **backend** is complete and usable.
+
+- Project status: Core, Resolver, Media, Library, Administration, and Docker packaging are implemented
+- Current phase: Core V1 delivered and extended; Resolver V1 delivered (freeze evaluation: ALL GATES PASS)
+- Core database schema: **1.2.0** (1.1.0 lifecycle/purge + 1.2.0 media table)
+- Resolver database schema: **1.1.0** (snapshot + FTS5 + expansion maps)
 - Core REST API: V1
 - CoreService: Implemented
-- Core Portal: Server-rendered, verified
+- Core Portal: Server-rendered (Jinja2 templates), verified
 - Memory Activate: Implemented
 - Lifecycle (Forget / Restore / Purge): Implemented
+- Media (images, covers, thumbnails, lifecycle): Implemented
+- Library and Reader views: Implemented
 - Administration page: Implemented
 - Dashboard metrics: Implemented
 - Audit summary, filters, pagination: Implemented
+- Resolver: Implemented (projection, FTS5 search, ranking, freshness, selective + atomic rebuild, Debug Portal)
+- Docker: Implemented (host bind mounts for data + external category covers)
 - Manual Portal verification: PASS
-- Resolver: Foundation D delivered (schema 1.1.0, Resolver Debug Portal)
-- MCP readiness: Not ready
+- Samjon Memory MCP adapter: **separate repository / work item** (not part of this repository)
+
+### MCP readiness
+
+The **backend** is MCP-ready: it exposes the read/query APIs an external MCP
+adapter needs (`POST /api/v1/resolver/query`, memory and collection read
+endpoints, and `GET /api/v1/capabilities` for discovery). The backend does not
+itself implement MCP transport or tool registration — that is the Samjon Home
+MCP module, a separate repository and work item. The backend being a complete
+service does not imply the independent MCP adapter exists.
+
+## System components
+
+```text
+Core     -> authoritative Memories and Collections   (samjon_core.sqlite, schema 1.2.0)
+Resolver -> deterministic retrieval projection        (samjon_resolver.sqlite, schema 1.1.0)
+Media    -> images, covers, thumbnails, lifecycle      (data/media + media table in Core)
+Portal   -> Jinja2 Library + Administration            (HTTP Basic + exact Origin)
+Docker   -> portable deployment, host bind mounts      (Dockerfile, compose.yaml)
+```
 
 ## Core Baseline
 
-- Core schema is versioned at 1.1.0
+- Core schema is versioned at 1.2.0
 - Lifecycle (activate / restore / purge) and audit (summary, filters, pagination) are implemented on top of the V1 core
+- Media metadata is stored in Core (schema 1.2.0); binary files live under `data/media/`
 - Portal is server-rendered with HTTP Basic auth and exact Origin validation
 
 ## Portal Implementation
 
 The Core Portal has been verified with:
 
-- One server-rendered Portal
+- One server-rendered Portal rendered from **Jinja2 templates** (autoescaped; no Python HTML-string renderers, no SPA)
 - FastAPI HTTP Basic Authentication
 - Exactly one configured administrator
 - No users table, no registration, no custom login page
@@ -61,7 +87,7 @@ Required configuration:
 
 ## Portal Status
 
-- Server-rendered Portal: Implemented
+- Server-rendered Portal: Implemented (Jinja2 templates)
 - HTTP Basic authentication: Verified by tests
 - Exact Origin validation: Verified by tests
 - Memory Portal workflow: Verified by tests
@@ -69,15 +95,16 @@ Required configuration:
 - Cancel behavior: Verified by tests
 - Portal security tests: All passing
 - Capability reporting: Verified by tests
+- Resolver Debug Portal (/portal/resolver/): Implemented, verified by tests
 
 ## Resolver
 
-- Status: Foundation D delivered (Resolver Debug Portal); Resolver V1 Freeze Evaluation: ALL GATES PASS -> READY_FOR_OWNER_APPROVAL
+- Status: Implemented; Resolver V1 Freeze Evaluation: ALL GATES PASS -> READY_FOR_OWNER_APPROVAL
 - Resolver database (samjon_resolver.sqlite): created, schema 1.1.0
 - FTS5 availability check: Implemented (fail-fast RESOLVER_DATABASE_UNAVAILABLE)
 - Resolver migrations: Implemented and idempotent
 - Resolver schema metadata: Implemented
-- Resolver state + projection-audit foundations: schema only
+- Resolver state + projection-audit: Implemented (single-row resolver_state, append-only projection_audit)
 - Resolver database isolation from Core: PROVEN by tests
 - Resolver readiness independent of Core: PROVEN; `/resolver/ready` endpoint
 - Full projection build (active standalone / collection / sections ordered by sequence): Implemented, PROVEN by tests
@@ -113,26 +140,56 @@ Required configuration:
 - Rebuild controls require explicit `rebuild` confirmation; Cancel is a no-side-effect navigation link
 - Acceptance dataset (synthetic) + acceptance tests: Thai/English search, aliases, vocabulary, collections/sections, ambiguous/no-match, stale/allow_stale
 - Resolver V1 Freeze Evaluation: ALL GATES PASS (see `docs/resolver/RESOLVER_V1_FREEZE_EVALUATION.md`)
-- Not implemented / out of scope: embeddings, vector search, AI enrichment, MCP, Numchoke integration
+- Not implemented / out of scope in the backend: embeddings, vector search, AI enrichment, Numchoke integration
 - Semantic search: Not implemented
 - AI enrichment: Not implemented
 - Embeddings: Not implemented
-- MCP implementation: Not implemented
+- MCP (backend-internal): Not implemented by design — the Samjon Home MCP adapter is a separate repository / work item
+
+## Media
+
+- Status: Implemented (Core schema 1.2.0 adds the `media` metadata table)
+- Covers, illustrations, and galleries for Memories, Collections, and Collection Sections
+- Originals + derived thumbnails under `data/media/`; SQLite stores metadata only
+- Upload, list, cover selection, metadata (alt/caption), reorder, replace, remove, purge
+- Lifecycle: forget hides media; restore reuses it; purge erases files + metadata (tombstone)
+- Backup: `media_create_backup` / `media_check_backup` / `media_restore_backup`
+- Resolver indexes only validated alt text/captions for active media
+
+## Library and Portal
+
+- Portal is rendered from **Jinja2 templates** (no Python HTML-string renderers, no SPA)
+- Library homepage, search, subject-category pages, Memory/Collection Readers, and galleries
+- Administration: standalone memory + collection create/edit, section editing, reorder, validation, activation, supersede, forget, restore, purge
+- Authenticated via HTTP Basic (one configured admin); mutations validate exact Origin
+- Resolver Debug Portal under `/portal/resolver/`
+
+## Docker deployment
+
+- Status: Implemented (Dockerfile + compose.yaml; Portainer `samjon_stack.yaml`)
+- Runs as a non-root user, single Uvicorn worker, migrations on startup
+- **Host bind mounts** persist runtime data: `./data` -> `/app/data` and `./category-covers` -> `/app/category-covers` (read-only)
+- No named data volume
+- External category covers are read from `SAMJON_CATEGORY_COVERS_ROOT` and can be replaced without rebuilding the image
 
 ## Test Evidence
 
 All tests pass with executable evidence:
 
-- Command: `python -m pytest tests/ -v --tb=short`
-- Passed: 273
+- Command: `python -m pytest tests/ -q --no-header`
+- Passed: 453
 - Failed: 0
 - Skipped: 0
-- Verified: 2026-09-20
+- Verified: 2026-09-25
 
 ### Coverage Areas
-- Migration and migration idempotency (schema 1.1.0, backfill of `forgotten_at` from audit)
+- Migration and migration idempotency (Core schema 1.2.0; 1.1.0 backfills `forgotten_at` from reliable audit evidence)
 - Memory create/read/query/update/supersede/forget/activate/restore/purge
 - Collection create/edit/order/validate/activate/restore/purge, independent section editing
+- Resolver migrations, schema 1.1.0, projection, FTS5 search, deterministic ranking, freshness, atomic + selective rebuild, bounded context
+- Media lifecycle (upload, covers, reorder, replace, remove, purge, backup/restore) and Resolver media-text indexing
+- Jinja2 Portal: Library, Readers, Administration; HTTP Basic, exact Origin, XSS, Cancel no-side-effect, credentials absent
+- Docker packaging: bind mounts, no named volume, external category covers, host-dir creation, read-only cover mount
 - Collection subject/scope consistency (sections inherit subject/scope, title is the section name, move-existing requires match, collection immutable once sections exist)
 - Dashboard metrics + filtered-list links
 - Forget/Restore/Purge lifecycle, purge guards (30-day retention, admin, `PURGE` confirmation), tombstones, related-metadata erasure
