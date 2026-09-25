@@ -2,7 +2,7 @@
 
 **Document ID:** SAMJON-CORE-V1-FREEZE-001
 **Version:** 1.0.0
-**Status:** FROZEN BASELINE
+**Status:** FROZEN BASELINE (historical record; Core has since moved to schema 1.2.0)
 **Owner:** Samjon Memory Engineering
 **Approved by:** Jeab
 **Freeze approval date:** 2026-09-18
