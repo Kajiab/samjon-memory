@@ -1,12 +1,12 @@
 # Resolver Rebuild and Test Plan
 
 **Document ID:** SAMJON-RESOLVER-REBUILD-001
-**Status:** PLANNED
+**Status:** PROVEN / IMPLEMENTED
 **Owner:** Samjon Memory Engineering
 **Approver:** Jeab
-**Last reviewed:** 2026-09-20
+**Last reviewed:** 2026-09-25
 
-> Foundations B and C2 (full + selective rebuild, expansion refresh, and bounded
+> Full + selective rebuild, expansion refresh, bounded
 > context expansion) are implemented and tested; this document records the
 > design and the Resolver Portal plan.
 
