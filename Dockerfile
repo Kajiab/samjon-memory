@@ -1,20 +1,7 @@
 # syntax=docker/dockerfile:1
-#
-# Samjon Memory - production-like local image.
-#
-# Multi-stage build:
-#   builder  - builds the samjon-memory wheel (incl. Jinja templates + static
-#              assets declared in [tool.setuptools.package-data]) and installs it
-#              into a self-contained virtualenv at /opt/venv.
-#   runtime  - copies only the venv + runtime files, runs as the unprivileged
-#              `samjon` user (uid/gid 10001), binds to 0.0.0.0:8100.
-#
-# No shell entrypoint is required: Core/Resolver migrations run automatically on
-# startup (ensure_schema), and the named volume in compose.yaml preserves the
-# image directory ownership so the non-root user can write /app/data.
 
 # ---------------------------------------------------------------------------
-# Builder stage
+# Builder stage (บังคับติดตั้งไลบรารีตรงๆ ป้องกันปัญหาหลุดร่วง)
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim AS builder
 
@@ -23,35 +10,32 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /build
 
-# Copy package metadata first for layer caching.
-# MANIFEST.in is required by setuptools to ship the Jinja templates and Portal
-# static assets as package data; README is referenced by MANIFEST.in.
 COPY pyproject.toml MANIFEST.in README.md ./
-# Copy the application source.
-COPY src ./src
+#COPY src ./src
 
-# Create a self-contained virtualenv, build the wheel, install it + runtime deps.
-# Pillow and Jinja2 are explicit runtime dependencies in pyproject.toml.
 RUN python -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel build \
-    && /opt/venv/bin/python -m build --wheel \
-    && /opt/venv/bin/pip install --no-cache-dir dist/*.whl
+    && /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && /opt/venv/bin/pip install --no-cache-dir fastapi uvicorn pydantic pyyaml Pillow Jinja2 python-multipart 
+#    && /opt/venv/bin/pip install --no-cache-dir --no-deps .
 
 # ---------------------------------------------------------------------------
-# Runtime stage
+# Runtime stage (ใช้ของเดิมที่คุณมีได้เลยครับ)
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app/src"
 
 WORKDIR /app
 
-# Copy the installed application (venv only) - no tests, no .git, no source tree.
 COPY --from=builder /opt/venv /opt/venv
+# The application source is NOT baked into the image: it is provided at run
+# time as a host bind mount (./src -> /app/src) and imported via
+# PYTHONPATH=/app/src, so editing *.py or Portal files requires only a
+# container restart - never an image rebuild.
 
-# Non-root service user + predictable data directories owned by that user.
 RUN groupadd --system --gid 10001 samjon \
     && useradd --system --uid 10001 --gid samjon --home-dir /app --shell /usr/sbin/nologin samjon \
     && mkdir -p /app/data/media/originals \
@@ -59,10 +43,12 @@ RUN groupadd --system --gid 10001 samjon \
                 /app/data/media/archived \
     && chown -R samjon:samjon /app
 
-USER samjon
+# NOTE: `USER samjon` stays disabled here so the container runs as root
+# (matches the current bind-mount workflow). Re-enable it for the hardened
+# non-root baseline - the data dirs under /app/data are already owned by
+# uid 10001.
+#USER samjon
 
 EXPOSE 8100
 
-# exec-form CMD; single worker (SQLite, no proven multi-worker evidence);
-# no --reload; binds inside the container so compose maps the host port.
 CMD ["python", "-m", "uvicorn", "samjon_memory.core.main:app", "--host", "0.0.0.0", "--port", "8100"]

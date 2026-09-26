@@ -1,8 +1,10 @@
 # Samjon Memory - local container deployment.
 #
 # Persistence: host-visible bind mounts, not a named volume.
-#   data/            -> /app/data          (Core/Resolver SQLite + media)
+#   data/            -> /app/data         (Core/Resolver SQLite + media)
 #   category-covers/ -> /app/category-covers (read-only, replaceable covers)
+#   src/             -> /app/src          (live application source; edits need
+#                                          a restart, never an image rebuild)
 #
 # Usage:
 #   copy .env.docker.example -> .env   (set real secrets)
@@ -53,6 +55,9 @@ services:
       - type: bind
         source: ./data
         target: /app/data
+      - type: bind
+        source: ./src
+        target: /app/src
       - type: bind
         source: ./category-covers
         target: /app/category-covers

@@ -1,6 +1,8 @@
 {% macro text(f) -%}
+{% set list_id = f.name ~ "-vocab" %}{% set has_options = f.options and f.options|length > 0 %}
 <label class="field"><span class="field-label">{{ f.label }}{% if f.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</span>
-<input name="{{ f.name }}" type="{{ f.type }}" value="{{ f.value }}"{% if f.required %} required{% endif %}{% if f.maxlen %} maxlength="{{ f.maxlen }}"{% endif %}{% if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %}/>
+<input name="{{ f.name }}" type="{{ f.type }}" value="{{ f.value }}"{% if f.required %} required{% endif %}{% if f.maxlen %} maxlength="{{ f.maxlen }}"{% endif %}{% if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %}{% if has_options %} list="{{ list_id }}"{% endif %}/>
+{% if has_options %}<datalist id="{{ list_id }}">{% for opt in f.options %}<option value="{{ opt }}"></option>{% endfor %}</datalist>{% endif %}
 {% if f.helper %}<span class="hint">{{ f.helper }}</span>{% endif %}</label>
 {%- endmacro %}
 

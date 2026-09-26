@@ -9,6 +9,7 @@ become needed; leftover legacy renderers in ``pages`` are removed at the end.
 from __future__ import annotations
 
 import samjon_memory.portal.pages as pages
+from samjon_memory.portal import vocabulary as _vocabulary
 
 
 # ---- Small shared view models -----------------------------------------------
@@ -423,10 +424,11 @@ def collection_reader_vm(collection, sections, back=None, media=None) -> dict:
 # ---- Admin: field view models ----------------------------------------------
 
 def text_field_vm(name, label, value="", required=False, maxlen=None, placeholder="",
-                  helper="", type_="text") -> dict:
+                  helper="", type_="text", options=None) -> dict:
     return {"kind": "text", "name": name, "label": label, "value": value,
             "required": bool(required), "maxlen": maxlen,
-            "placeholder": placeholder, "helper": helper, "type": type_}
+            "placeholder": placeholder, "helper": helper, "type": type_,
+            "options": list(options) if options else []}
 
 
 def textarea_field_vm(name, label, value="", required=False, maxlen=None, rows=6,
@@ -438,6 +440,19 @@ def textarea_field_vm(name, label, value="", required=False, maxlen=None, rows=6
 
 def readonly_field_vm(label, value, helper="") -> dict:
     return {"kind": "readonly", "label": label, "value": value, "helper": helper}
+
+
+def _options_with_current(words, current) -> list:
+    """Combobox suggestions: collected words plus the current typed value.
+
+    The current value is prepended (when not already present, case-insensitive)
+    so the active value always appears among the suggestions.
+    """
+    opts = [w for w in (words or []) if w]
+    cur = (current or "").strip()
+    if cur and not any(w.lower() == cur.lower() for w in opts):
+        opts.insert(0, cur)
+    return opts
 
 
 # ---- Admin media -------------------------------------------------------------
@@ -543,17 +558,27 @@ def memory_detail_vm(memory, message="", media=None) -> dict:
 # -- ADMIN A --
 
 
-def memory_create_vm(message="", error="") -> dict:
+def memory_create_vm(message="", error="", vocabulary=None) -> dict:
     prefill = error if isinstance(error, dict) else {}
     err_text = error if isinstance(error, str) else ""
+    words = vocabulary or {}
+    subj_prefill = prefill.get("subject", "")
     fields = [
-        text_field_vm("subject", "Subject", prefill.get("subject", ""), required=True,
-                      maxlen=500, placeholder="e.g. Living room lighting",
-                      helper="A short, memorable name for this memory."),
+        text_field_vm("subject", "Subject", subj_prefill, required=True,
+                      maxlen=500, placeholder="e.g. person:jeab",
+                      options=_options_with_current(words.get("subject"), subj_prefill),
+                      helper="Canonical identity of what this memory is about. "
+                             "Choose a collected word or type a new one - it will be remembered."),
         text_field_vm("memory_type", "Type", prefill.get("memory_type", "fact"),
-                      maxlen=100, helper="e.g. fact, note, preference."),
+                      maxlen=100,
+                      options=_options_with_current(words.get("memory_type"),
+                                                    prefill.get("memory_type", "fact")),
+                      helper="What kind of knowledge this is, e.g. fact, preference, instruction. "
+                             "Pick a word or type a new one."),
         text_field_vm("scope", "Scope", prefill.get("scope", "household"), maxlen=100,
-                      helper="Where this memory applies, e.g. household."),
+                      options=_options_with_current(words.get("scope"),
+                                                    prefill.get("scope", "household")),
+                      helper="Where this memory applies, e.g. household, personal."),
         text_field_vm("title", "Title", prefill.get("title", ""), maxlen=500,
                       helper="Optional short title."),
         textarea_field_vm("raw_content", "Content", prefill.get("raw_content", ""),
@@ -572,28 +597,32 @@ def memory_create_vm(message="", error="") -> dict:
     }
 
 
-def memory_edit_vm(memory, message="", error="") -> dict:
+def memory_edit_vm(memory, message="", error="", vocabulary=None) -> dict:
     if not memory:
         return {"not_found": True}
     prefill = error if isinstance(error, dict) else {}
     err_text = error if isinstance(error, str) else ""
+    words = vocabulary or {}
     mid = memory["memory_id"]
     is_section = bool(memory.get("collection_id"))
+    cur_type = prefill.get("memory_type", memory.get("memory_type", "fact"))
     fields = []
     if is_section:
         fields.append(readonly_field_vm("Subject", memory.get("subject", ""),
                                         "Inherited from the Collection; cannot be changed."))
-        fields.append(text_field_vm("memory_type", "Type",
-                                    prefill.get("memory_type", memory.get("memory_type", "fact")), maxlen=100))
+        fields.append(text_field_vm("memory_type", "Type", cur_type, maxlen=100,
+                                    options=_options_with_current(words.get("memory_type"), cur_type)))
         fields.append(readonly_field_vm("Scope", memory.get("scope", ""),
                                         "Inherited from the Collection; cannot be changed."))
     else:
-        fields.append(text_field_vm("subject", "Subject",
-                                    prefill.get("subject", memory.get("subject", "")), required=True, maxlen=500))
-        fields.append(text_field_vm("memory_type", "Type",
-                                    prefill.get("memory_type", memory.get("memory_type", "fact")), maxlen=100))
-        fields.append(text_field_vm("scope", "Scope",
-                                    prefill.get("scope", memory.get("scope", "household")), maxlen=100))
+        cur_subject = prefill.get("subject", memory.get("subject", ""))
+        cur_scope = prefill.get("scope", memory.get("scope", "household"))
+        fields.append(text_field_vm("subject", "Subject", cur_subject, required=True, maxlen=500,
+                                    options=_options_with_current(words.get("subject"), cur_subject)))
+        fields.append(text_field_vm("memory_type", "Type", cur_type, maxlen=100,
+                                    options=_options_with_current(words.get("memory_type"), cur_type)))
+        fields.append(text_field_vm("scope", "Scope", cur_scope, maxlen=100,
+                                    options=_options_with_current(words.get("scope"), cur_scope)))
     fields += [
         text_field_vm("title", "Title", prefill.get("title", memory.get("title", "")), maxlen=500),
         textarea_field_vm("raw_content", "Content",
@@ -640,15 +669,26 @@ def collection_list_vm(collections, message="", status_filter="", invalid=False)
             "invalid": bool(invalid), "has_rows": bool(collections)}
 
 
-def collection_create_vm(message="", error="") -> dict:
+def collection_create_vm(message="", error="", vocabulary=None) -> dict:
     prefill = error if isinstance(error, dict) else {}
     err_text = error if isinstance(error, str) else ""
+    words = vocabulary or {}
+    subj_prefill = prefill.get("subject", "")
     fields = [
-        text_field_vm("subject", "Subject", prefill.get("subject", ""), required=True,
-                      maxlen=500, placeholder="e.g. Garden care"),
+        text_field_vm("subject", "Subject", subj_prefill, required=True,
+                      maxlen=500, placeholder="e.g. plants:garden",
+                      options=_options_with_current(words.get("subject"), subj_prefill),
+                      helper="Canonical subject of the collection. Choose a collected word "
+                             "or type a new one - it will be remembered."),
         text_field_vm("collection_type", "Type", prefill.get("collection_type", "fact"),
-                      maxlen=100),
-        text_field_vm("scope", "Scope", prefill.get("scope", "household"), maxlen=100),
+                      maxlen=100,
+                      options=_options_with_current(words.get("collection_type"),
+                                                    prefill.get("collection_type", "fact")),
+                      helper="What kind of collection, e.g. guide, reference, procedure."),
+        text_field_vm("scope", "Scope", prefill.get("scope", "household"), maxlen=100,
+                      options=_options_with_current(words.get("scope"),
+                                                    prefill.get("scope", "household")),
+                      helper="Where this collection applies, e.g. household, personal."),
         text_field_vm("title", "Title", prefill.get("title", ""), required=True,
                       maxlen=500, helper="A short name for the collection."),
         textarea_field_vm("summary", "Summary", prefill.get("summary", ""), maxlen=8192,
@@ -671,20 +711,24 @@ def collection_create_vm(message="", error="") -> dict:
     }
 
 
-def collection_edit_vm(collection, message="", error="") -> dict:
+def collection_edit_vm(collection, message="", error="", vocabulary=None) -> dict:
     if not collection:
         return {"not_found": True}
     prefill = error if isinstance(error, dict) else {}
     err_text = error if isinstance(error, str) else ""
+    words = vocabulary or {}
     cid = collection["collection_id"]
     ev = str(collection.get("expected_item_count") or "")
+    cur_subject = prefill.get("subject", collection.get("subject", ""))
+    cur_type = prefill.get("collection_type", collection.get("collection_type", "fact"))
+    cur_scope = prefill.get("scope", collection.get("scope", "household"))
     fields = [
-        text_field_vm("subject", "Subject",
-                      prefill.get("subject", collection.get("subject", "")), required=True, maxlen=500),
-        text_field_vm("collection_type", "Type",
-                      prefill.get("collection_type", collection.get("collection_type", "fact")), maxlen=100),
-        text_field_vm("scope", "Scope",
-                      prefill.get("scope", collection.get("scope", "household")), maxlen=100),
+        text_field_vm("subject", "Subject", cur_subject, required=True, maxlen=500,
+                      options=_options_with_current(words.get("subject"), cur_subject)),
+        text_field_vm("collection_type", "Type", cur_type, maxlen=100,
+                      options=_options_with_current(words.get("collection_type"), cur_type)),
+        text_field_vm("scope", "Scope", cur_scope, maxlen=100,
+                      options=_options_with_current(words.get("scope"), cur_scope)),
         text_field_vm("title", "Title",
                       prefill.get("title", collection.get("title", "")), required=True, maxlen=500),
         textarea_field_vm("summary", "Summary",
@@ -710,10 +754,11 @@ def collection_edit_vm(collection, message="", error="") -> dict:
 
 
 def collection_detail_vm(collection, memories, validation, message="", reopened=False,
-                         media=None) -> dict:
+                         media=None, vocabulary=None) -> dict:
     if not collection:
         return {"not_found": True}
     cid = collection["collection_id"]
+    words = vocabulary or {}
     fields = [{"label": label, "value": collection.get(key, ""),
                "pre": key == "summary"}
               for key, label in pages._COLLECTION_FIELDS if key in collection]
@@ -759,7 +804,8 @@ def collection_detail_vm(collection, memories, validation, message="", reopened=
     add_section_fields = [
         text_field_vm("title", "Section title", "", required=True, maxlen=500,
                       placeholder="e.g. Overview"),
-        text_field_vm("memory_type", "Type", "fact", maxlen=100),
+        text_field_vm("memory_type", "Type", "fact", maxlen=100,
+                      options=_options_with_current(words.get("memory_type"), "fact")),
         textarea_field_vm("raw_content", "Content", "", required=True, maxlen=16384, rows=6),
         text_field_vm("structured_value", "Structured value (optional)",
                       helper="Optional structured data, as text."),
@@ -795,6 +841,45 @@ def collection_detail_vm(collection, memories, validation, message="", reopened=
         "restore_action": f"/portal/collections/{cid}/restore",
         "purge_action": f"/portal/collections/{cid}/purge",
         "version": collection.get("version", ""),
+    }
+
+
+# ---- Vocabulary (admin curation) ---------------------------------------------
+
+_VOCAB_SECTIONS = [
+    ("subject", "Subject",
+     "Subject of Memories and Collections, e.g. person, plant, pet. "
+     "Use domain:id form such as person:jeab when the subject is a specific thing."),
+    ("memory_type", "Memory Type",
+     "Type of a Memory or Collection Section, e.g. fact, preference, instruction."),
+    ("collection_type", "Collection Type",
+     "Type of a Collection, e.g. guide, reference, procedure."),
+    ("scope", "Scope",
+     "Where the knowledge applies and how it is separated, e.g. household, personal."),
+]
+
+
+def vocabulary_vm(vocab, message="", error="") -> dict:
+    vocab = vocab or {}
+    sections = []
+    for key, label, hint in _VOCAB_SECTIONS:
+        words = list(vocab.get(key) or [])
+        sections.append({
+            "key": key,
+            "label": label,
+            "hint": hint,
+            "words": words,
+            "count": len(words),
+            "has_words": bool(words),
+            "remove_action": f"/portal/vocabulary/{key}/remove",
+        })
+    err_text = pages._friendly_error(error) if error else ""
+    return {
+        "sections": sections,
+        "max_per_list": _vocabulary.MAX_WORDS_PER_LIST,
+        "max_word_length": _vocabulary.MAX_WORD_LENGTH,
+        "banner": banner_vm(message),
+        "error_text": err_text,
     }
 
 

@@ -212,6 +212,10 @@ _MESSAGE_TEXT = {
     "restored": "Record restored to draft.",
     "purged": "Record purged permanently.",
     "resolver_rebuilt": "Rebuild complete. The search index was updated.",
+    "words_added": "Vocabulary updated.",
+    "word_removed": "Word removed from the vocabulary.",
+    "no_words_added": "No new words were added - duplicates are ignored.",
+    "word_not_found": "That word is not in this list.",
 }
 
 _STATUS_LABELS = {

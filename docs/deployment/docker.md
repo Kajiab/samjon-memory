@@ -1,8 +1,13 @@
 # Samjon Memory - Docker deployment
 
 Containers Samjon Memory (Core, Resolver, Media, Portal) as a self-contained,
-production-like local service. The image runs as a non-root user and persists all
-durable data on the host via **bind mounts** - the host sees and owns the data.
+production-like local service. Runtime data persists on the host via **bind
+mounts** - the host sees and owns the data.
+
+> **Runtime user:** the current image runs as **root** (`USER samjon` is commented
+> out to match the bind-mount workflow). The hardened non-root baseline still
+> exists in the image (uid/gid 10001, data dirs pre-created and `chown`ed on
+> build) - uncomment `USER samjon` in the `Dockerfile` to restore it.
 
 - [Files](#files)
 - [Architecture](#architecture)
@@ -46,6 +51,7 @@ Browser (Portal) / Numchoke (HTTP APIs)
         |
         v  bind mounts (host-visible)
   ./data            /app/data
+  ./src             /app/src (live application source)
   ./category-covers /app/category-covers (read-only)
 ```
 
@@ -109,6 +115,7 @@ The full list of tunable variables is in `.env.docker.example`.
 | Host path (relative to compose project) | Container path | Mode |
 | ---- | ---- | ---- |
 | `./data` | `/app/data` | read-write |
+| `./src` | `/app/src` | read-write (live application source) |
 | `./category-covers` | `/app/category-covers` | read-only |
 
 Persisted under the repository-local `./data/`:
@@ -133,8 +140,11 @@ covers (JPEG/JPG/PNG/WebP); user-uploaded media never lives there.
 - Data lives directly on the host under `./data` (bind mount to `/app/data`).
   It survives `docker compose down` and image rebuilds - it is never stored in
   the image and never inside a Docker-managed named volume.
-- The container runs as the non-root user `samjon` (uid/gid `10001`). It must be
-  able to create and write `/app/data` and `/app/data/media`.
+- The image defines the non-root user `samjon` (uid/gid `10001`) and pre-creates
+  the `/app/data/media/...` directories owned by it. The current `Dockerfile`
+  keeps `USER samjon` commented out, so the process runs as root; for the
+  hardened baseline re-enable `USER samjon` (that user only needs write access
+  to `/app/data` and `/app/data/media`).
 - On startup (production mode) the application runs a **writeability check** for
   `/app/data` and `/app/data/media`: it creates them from trusted configuration
   if missing and fails with a clear message if `/app/data` is not writable. An
@@ -188,8 +198,10 @@ Health check: compose marks the service healthy once `GET /health` returns
 - The container binds `0.0.0.0:8100` **inside** the container; the host is only
   exposed on the published port (default `8100`). Do not expose the service to
   the public internet; it is intended for an explicitly trusted local network.
-- SQLite files are owned only by the `samjon` user inside the container and live
-  on a host bind mount - never bake them into the image.
+- SQLite files live on a host bind mount (`./data` -> `/app/data`) and are never
+  baked into the image. When `USER samjon` is re-enabled they are owned by
+  uid 10001 inside the container; with the current root runtime the host files
+  themselves own the data.
 - Leave `SAMJON_CORE_ENV=production`. The REST API becomes token-authenticated
   when the three tokens are set; the Portal always requires HTTP Basic.
 - Never commit `.env`; it is excluded by `.gitignore` and `.dockerignore`.
@@ -229,12 +241,18 @@ Warnings:
 - **Category covers changed:** copy the new images into `category-covers/`; a
   container **restart is sufficient** (`docker compose restart` or
   `docker-up.ps1`). No rebuild.
-- **Python / Jinja / CSS / JavaScript / dependencies changed:** a Docker image
-  rebuild is required (`docker compose up -d --build`), because those assets are
-  baked into the image.
+- **Application source changed** (`*.py`, Jinja templates, CSS/JS under
+  `src/`): a **restart is sufficient** - the source is bind-mounted
+  (`./src` -> `/app/src`) and read live. Use `docker compose restart` (or the
+  helpers). Static assets and Jinja templates load from disk on demand; Python
+  modules are re-imported on restart (no `--reload` is enabled).
+- **Python / system / library dependencies changed** (`pyproject.toml`): a full
+  image rebuild is required (`docker compose up -d --build`), because the venv
+  is baked into the image.
 
-Do not bind-mount application source into the container in production; keep the
-immutable image as the single source of application code.
+> The live-source bind mount is the chosen workflow here: edits under
+> `src/` never require an image rebuild. The image remains the single source of
+> the runtime venv (dependencies); the host source drives application code.
 
 ## Portainer stack
 
@@ -269,30 +287,37 @@ D:/HomeAssistant/samjon-memory/category-covers:/app/category-covers:ro
 
 ## Troubleshooting
 
-- **`Samjon data directory is not writable`** on startup: the host bind mount
-  `./data` is not writable by the container user. On Linux run
-  `sudo chown -R 10001:10001 ./data` (see Persistence). On Windows Docker
-  Desktop this is normally automatic.
+- **`Samjon data directory is not writable`** on startup (only when `USER samjon`
+  is re-enabled): the host bind mount `./data` is not writable by the container
+  user. On Linux run `sudo chown -R 10001:10001 ./data` (see Persistence). The
+  current image runs as root, so this check usually passes; re-enabling the
+  non-root baseline reintroduces the requirement.
 - **Container unhealthy / restarting:** check logs (`docker-logs.ps1`). `/health`
   returns `degraded` if Core cannot open its database.
 - **Portal returns 401:** Portal credentials are not set (or wrong) - set
   `SAMJON_PORTAL_USERNAME`/`SAMJON_PORTAL_PASSWORD` and restart.
 - **Host port 8100 busy:** change `SAMJON_CORE_PORT` in `.env` (Compose publishes
   that host port to container `8100`).
-- **Templates or static assets missing:** the image was built from an older
-  wheel; rebuild with `docker compose up -d --build` after updating the package
-  data config (`MANIFEST.in`) in `pyproject.toml`.
+- **Templates or static assets missing / 404:** the `./src` bind mount is not
+  mapped (or the file was deleted on the host). Check `docker compose ps` shows
+  the mount and that `src/samjon_memory/portal/templates`/`static` exists on the
+  host; a `docker compose restart` refreshes the mounted tree.
 
 ## Design decisions
 
 - **Bind mounts instead of a named volume:** host-visible data (`./data`,
   `./category-covers`) for easy backup, inspection, and cover replacement.
-- **Multi-stage build** keeps the runtime image small (only the venv is copied;
-  no tests, no `.git`, no source tree, no `data/`).
+- **Multi-stage build** keeps the runtime image lean: the builder installs the
+  runtime libraries directly into a venv (no wheel build step). The image does
+  **not** bake application source; at run time the host `./src` is bind-mounted
+  to `/app/src`, and the app imports it via `PYTHONPATH=/app/src`. No tests, no
+  `.git`, no `data/` in the image.
 - **No shell entrypoint** is used for privilege dropping or migrations: migrations
   run automatically, and the startup writeability check surfaces permission
   problems clearly without recursive host `chown` from a privileged step.
 - **Single Uvicorn worker**: SQLite benefits from a single writer; there is no
   proven multi-worker evidence, so the image uses one worker and no `--reload`.
-- **Jinja2 + Pillow** are explicit runtime dependencies in `pyproject.toml`;
-  templates and Portal static assets are shipped in the wheel via `MANIFEST.in`.
+- **Jinja2, Pillow and python-multipart** are explicit runtime dependencies in
+  `pyproject.toml`; the builder installs them directly into the venv. Portal
+  templates/static assets ship with the application source copy under `/app/src`
+  (`MANIFEST.in` still declares the same package data for wheel builds).

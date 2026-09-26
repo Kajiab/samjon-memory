@@ -68,6 +68,7 @@ The Core Portal has been verified with:
 - Exact Origin validation for mutations
 - No-side-effect Cancel behavior
 - Add Section creates Memory ID automatically
+- Vocabulary hints (Portal-only): Subject/Type/Scope fields show collected words as datalist suggestions, new words used in successful saves are remembered automatically, curated at `/portal/vocabulary` (file-backed, never in Core/Resolver SQLite)
 - Collection subject/scope consistency invariant (sections inherit; move requires match; immutable once sections exist)
 - Collection Memories sorted by sequence_number ASC
 - Move Up / Move Down works correctly
@@ -144,33 +145,7 @@ Required configuration:
 - Semantic search: Not implemented
 - AI enrichment: Not implemented
 - Embeddings: Not implemented
-- MCP (backend-internal): Not implemented by design — the Samjon Home MCP adapter is a separate repository / work item
-
-## Media
-
-- Status: Implemented (Core schema 1.2.0 adds the `media` metadata table)
-- Covers, illustrations, and galleries for Memories, Collections, and Collection Sections
-- Originals + derived thumbnails under `data/media/`; SQLite stores metadata only
-- Upload, list, cover selection, metadata (alt/caption), reorder, replace, remove, purge
-- Lifecycle: forget hides media; restore reuses it; purge erases files + metadata (tombstone)
-- Backup: `media_create_backup` / `media_check_backup` / `media_restore_backup`
-- Resolver indexes only validated alt text/captions for active media
-
-## Library and Portal
-
-- Portal is rendered from **Jinja2 templates** (no Python HTML-string renderers, no SPA)
-- Library homepage, search, subject-category pages, Memory/Collection Readers, and galleries
-- Administration: standalone memory + collection create/edit, section editing, reorder, validation, activation, supersede, forget, restore, purge
-- Authenticated via HTTP Basic (one configured admin); mutations validate exact Origin
-- Resolver Debug Portal under `/portal/resolver/`
-
-## Docker deployment
-
-- Status: Implemented (Dockerfile + compose.yaml; Portainer `samjon_stack.yaml`)
-- Runs as a non-root user, single Uvicorn worker, migrations on startup
-- **Host bind mounts** persist runtime data: `./data` -> `/app/data` and `./category-covers` -> `/app/category-covers` (read-only)
-- No named data volume
-- External category covers are read from `SAMJON_CATEGORY_COVERS_ROOT` and can be replaced without rebuilding the image
+- MCP implementation: Not implemented
 
 ## Test Evidence
 
@@ -180,7 +155,7 @@ All tests pass with executable evidence:
 - Passed: 453
 - Failed: 0
 - Skipped: 0
-- Verified: 2026-09-25
+- Verified: 2026-09-26
 
 ### Coverage Areas
 - Migration and migration idempotency (Core schema 1.2.0; 1.1.0 backfills `forgotten_at` from reliable audit evidence)

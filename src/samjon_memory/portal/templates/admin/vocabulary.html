@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Vocabulary</h1>
+{% include "components/banner.html" %}
+{% if error_text %}<div class="banner error" role="alert">{{ error_text }}</div>{% endif %}
+<p class="subtitle">Collected words for Subject, Type and Scope. They appear as suggestions wherever you create or edit Memories and Collections &mdash; type a new word and it will be remembered automatically.</p>
+{% for s in sections %}
+<section class="card vocab-section">
+<h2>{{ s.label }} <span class="vocab-count">{{ s.count }}</span></h2>
+<p class="hint">{{ s.hint }}</p>
+{% if s.has_words %}
+<ul class="vocab-chips">
+{% for w in s.words %}
+<li class="vocab-chip"><span class="vocab-word">{{ w }}</span>
+<form method="post" action="{{ s.remove_action }}" class="vocab-remove"><input type="hidden" name="word" value="{{ w }}"/><button type="submit" class="btn btn-xsmall btn-ghost" aria-label="Remove {{ w }}" title="Remove word">Remove</button></form>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<div class="empty-state"><p>No words yet.</p><p>Add the first one below, or save a Memory that uses it.</p></div>
+{% endif %}
+<form method="post" action="/portal/vocabulary/add" class="vocab-add">
+<input type="hidden" name="list" value="{{ s.key }}"/>
+<label class="field"><span class="field-label">Add words</span>
+<textarea name="words" rows="2" placeholder="e.g. plant, person, recipe&#10;one word per line or comma separated"></textarea></label>
+<p class="hint">Lowercase, use _ for spaces (e.g. care_instruction). Up to {{ max_per_list }} words per list, {{ max_word_length }} characters each.</p>
+<button type="submit" class="btn">Add words</button>
+</form>
+</section>
+{% endfor %}
+<p class="cancel"><a class="btn btn-ghost" href="/portal/status">Back to Status</a></p>
+{% endblock %}

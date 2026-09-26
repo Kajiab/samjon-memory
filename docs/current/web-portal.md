@@ -24,7 +24,7 @@ Web Portal documentation for Samjon Memory Core V1.
 - Audit log view (summary, filters, pagination)
 - Administration page (forgotten/purged, retention, audit, schema/db status)
 
-Navigation (one unified navbar, `aria-current="page"`): **Library**, Memories, Collections, **Status** (user nav, visually primary) · **Administration**, Audit, Resolver Debug (admin nav, visually secondary with a separator). A drawn book-spine brand mark leads every page. Library is the default Portal page.
+Navigation (one unified navbar, `aria-current="page"`): **Library**, Memories, Collections, **Status** (user nav, visually primary) · **Administration**, Audit, Vocabulary, Resolver Debug (admin nav, visually secondary with a separator). A drawn book-spine brand mark leads every page. Library is the default Portal page.
 
 ### Admin Access (HTTP Basic Auth)
 - Standalone memory create
@@ -40,6 +40,7 @@ Navigation (one unified navbar, `aria-current="page"`): **Library**, Memories, C
 - Explicit collection activation
 - Add Section to Collection (creates Memory ID automatically; the section inherits subject/scope from the Collection, and the form has no subject/scope fields)
 - Move Up / Move Down for Collection sections
+- Vocabulary page (`/portal/vocabulary`) — curated hint words for Subject, Memory Type, Collection Type and Scope; add/remove suggestions (HTTP Basic + exact Origin), new words used in successful saves are remembered automatically
 
 ## 3. Authentication
 
@@ -64,6 +65,7 @@ Navigation (one unified navbar, `aria-current="page"`): **Library**, Memories, C
 - Cancel controls are navigation links with no side effects
 - Collection Memories are sorted by sequence_number ASC
 - Collection subject/scope consistency: sections inherit Collection subject/scope, title is the section name, moving an existing Memory requires a matching subject/scope, and a Collection with sections cannot change its subject/scope
+- Vocabulary suggestions: Subject, Type and Scope inputs in Memory/Collection create and edit forms render native HTML datalist suggestions from a Portal-side file-backed word bank (`SAMJON_PORTAL_VOCABULARY_PATH`, default `./data/portal_vocabulary.json`), seeded from the baseline catalogs in `docs/core/subject-type-guidelines.md`. Picking a word or typing a new one is free-form (never a closed enum), and words used in successful saves are remembered automatically. The bank is curated at `/portal/vocabulary` and is never stored in Core or Resolver SQLite.
 
 ## 5. Boundary Rules
 

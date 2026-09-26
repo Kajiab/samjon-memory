@@ -8,6 +8,13 @@ os.environ.setdefault("SAMJON_PORTAL_USERNAME", "portal-admin")
 os.environ.setdefault("SAMJON_PORTAL_PASSWORD", "portal-secret")
 os.environ.setdefault("SAMJON_PORTAL_ALLOWED_ORIGINS", "http://localhost:8100,http://127.0.0.1:8100")
 
+
+@pytest.fixture(autouse=True)
+def _portal_vocabulary_path(tmp_path, monkeypatch):
+    """Isolate the file-backed Portal vocabulary store per test."""
+    monkeypatch.setenv("SAMJON_PORTAL_VOCABULARY_PATH",
+                       str(tmp_path / "portal_vocabulary.json"))
+
 from samjon_memory.core.service import CoreService
 from samjon_memory.core.main import app
 from fastapi.testclient import TestClient

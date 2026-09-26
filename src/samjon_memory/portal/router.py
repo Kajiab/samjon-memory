@@ -12,6 +12,7 @@ from samjon_memory.constants import DEFAULT_PAGE_SIZE
 import samjon_memory.portal.pages as pages
 import samjon_memory.portal.templating as templating
 import samjon_memory.portal.viewmodels as viewmodels
+import samjon_memory.portal.vocabulary as _vocabulary
 import samjon_memory.resolver.portal as rpages
 from samjon_memory.resolver.service import ResolverService
 
@@ -169,6 +170,41 @@ async def portal_admin(request: Request, _: str = Depends(portal_auth)):
         **viewmodels.admin_vm(stats, message, resolver)))
 
 
+@router.get("/portal/vocabulary", response_class=HTMLResponse)
+async def portal_vocabulary_page(request: Request, _: str = Depends(portal_auth)):
+    message = _q(request, "message")
+    error = _q(request, "error")
+    return HTMLResponse(content=templating.render(
+        "admin/vocabulary.html", active="vocabulary",
+        **viewmodels.vocabulary_vm(_vocabulary.load_vocabulary(), message, error)))
+
+
+@router.post("/portal/vocabulary/add", response_class=HTMLResponse)
+async def portal_vocabulary_add(request: Request, _: str = Depends(portal_auth)):
+    validate_origin(request)
+    form = await request.form()
+    list_name = (form.get("list") or "").strip().lower()
+    if list_name not in _vocabulary.VOCAB_LISTS:
+        return RedirectResponse(
+            url="/portal/vocabulary?message=error: Unknown vocabulary list", status_code=303)
+    added = _vocabulary.add_words_and_save(list_name, form.get("words") or "")
+    message = "words_added" if added else "no_words_added"
+    return RedirectResponse(url=f"/portal/vocabulary?message={message}", status_code=303)
+
+
+@router.post("/portal/vocabulary/{list_name}/remove", response_class=HTMLResponse)
+async def portal_vocabulary_remove(list_name: str, request: Request, _: str = Depends(portal_auth)):
+    validate_origin(request)
+    list_name = list_name.strip().lower()
+    if list_name not in _vocabulary.VOCAB_LISTS:
+        return RedirectResponse(
+            url="/portal/vocabulary?message=error: Unknown vocabulary list", status_code=303)
+    form = await request.form()
+    removed = _vocabulary.remove_word_and_save(list_name, form.get("word") or "")
+    message = "word_removed" if removed else "word_not_found"
+    return RedirectResponse(url=f"/portal/vocabulary?message={message}", status_code=303)
+
+
 @router.get("/portal/memories", response_class=HTMLResponse)
 async def portal_memories(request: Request, _: str = Depends(portal_auth)):
     svc = _svc(request)
@@ -196,7 +232,7 @@ async def portal_memory_create_form(request: Request, _: str = Depends(portal_au
     error = _q(request, "error")
     return HTMLResponse(content=templating.render(
         "memories/create.html", active="memories",
-        **viewmodels.memory_create_vm(message, error)))
+        **viewmodels.memory_create_vm(message, error, _vocabulary.load_vocabulary())))
 
 
 @router.post("/portal/memories", response_class=HTMLResponse)
@@ -215,11 +251,13 @@ async def portal_memory_create(request: Request, _: str = Depends(portal_auth)):
     }
     try:
         mem = svc.create_memory(data, actor="portal")
+        _vocabulary.collect(subject=data.get("subject"), memory_type=data.get("memory_type"),
+                            scope=data.get("scope"))
         return RedirectResponse(url=f"/portal/memories/{mem['memory_id']}?message=created", status_code=303)
     except SamjonMemoryError as e:
         return HTMLResponse(content=templating.render(
             "memories/create.html", active="memories",
-            **viewmodels.memory_create_vm("", e.message)), status_code=e.status_code)
+            **viewmodels.memory_create_vm("", e.message, _vocabulary.load_vocabulary())), status_code=e.status_code)
 
 
 @router.get("/portal/memories/{memory_id}", response_class=HTMLResponse)
@@ -299,7 +337,7 @@ async def portal_memory_edit_form(request: Request, memory_id: str, _: str = Dep
     error = _q(request, "error")
     return HTMLResponse(content=templating.render(
         "memories/edit.html", active="memories",
-        **viewmodels.memory_edit_vm(memory, message, error)))
+        **viewmodels.memory_edit_vm(memory, message, error, _vocabulary.load_vocabulary())))
 
 
 @router.post("/portal/memories/{memory_id}", response_class=HTMLResponse)
@@ -315,6 +353,8 @@ async def portal_memory_edit(request: Request, memory_id: str, _: str = Depends(
         data["expected_version"] = int(form["expected_version"])
     try:
         svc.update_memory(memory_id, data, actor="portal")
+        _vocabulary.collect(subject=data.get("subject"), memory_type=data.get("memory_type"),
+                            scope=data.get("scope"))
         return RedirectResponse(url=f"/portal/memories/{memory_id}?message=updated", status_code=303)
     except (SamjonMemoryError, ValueError) as e:
         is_version_conflict = (
@@ -330,7 +370,8 @@ async def portal_memory_edit(request: Request, memory_id: str, _: str = Depends(
                 **viewmodels.memory_edit_vm(
                     mem, "",
                     "Version conflict: the memory was modified by another request. "
-                    "Please review and resubmit.")), status_code=409)
+                    "Please review and resubmit.",
+                    _vocabulary.load_vocabulary())), status_code=409)
         try:
             mem = svc.get_memory(memory_id)
         except SamjonMemoryError:
@@ -338,7 +379,7 @@ async def portal_memory_edit(request: Request, memory_id: str, _: str = Depends(
         error_msg = e.message if isinstance(e, SamjonMemoryError) else str(e)
         return HTMLResponse(content=templating.render(
             "memories/edit.html", active="memories",
-            **viewmodels.memory_edit_vm(mem, "", error_msg)),
+            **viewmodels.memory_edit_vm(mem, "", error_msg, _vocabulary.load_vocabulary())),
             status_code=400 if isinstance(e, ValueError) else e.status_code)
 
 
@@ -402,7 +443,7 @@ async def portal_collection_create_form(request: Request, _: str = Depends(porta
     error = _q(request, "error")
     return HTMLResponse(content=templating.render(
         "collections/create.html", active="collections",
-        **viewmodels.collection_create_vm(message, error)))
+        **viewmodels.collection_create_vm(message, error, _vocabulary.load_vocabulary())))
 
 
 @router.post("/portal/collections", response_class=HTMLResponse)
@@ -418,11 +459,13 @@ async def portal_collection_create(request: Request, _: str = Depends(portal_aut
         data["expected_item_count"] = int(form["expected_item_count"])
     try:
         coll = svc.create_collection(data, actor="portal")
+        _vocabulary.collect(subject=data.get("subject"), collection_type=data.get("collection_type"),
+                            scope=data.get("scope"))
         return RedirectResponse(url=f"/portal/collections/{coll['collection_id']}?message=created", status_code=303)
     except SamjonMemoryError as e:
         return HTMLResponse(content=templating.render(
             "collections/create.html", active="collections",
-            **viewmodels.collection_create_vm("", e.message)), status_code=e.status_code)
+            **viewmodels.collection_create_vm("", e.message, _vocabulary.load_vocabulary())), status_code=e.status_code)
 
 
 @router.get("/portal/collections/{collection_id}", response_class=HTMLResponse)
@@ -446,7 +489,8 @@ async def portal_collection_detail(request: Request, collection_id: str, _: str 
     return HTMLResponse(content=templating.render(
         "collections/detail.html", active="collections",
         **viewmodels.collection_detail_vm(
-            collection, memories, validation, message, reopened, media)))
+            collection, memories, validation, message, reopened, media,
+            _vocabulary.load_vocabulary())))
 
 
 @router.get("/portal/collections/{collection_id}/edit", response_class=HTMLResponse)
@@ -461,7 +505,7 @@ async def portal_collection_edit_form(request: Request, collection_id: str, _: s
     error = _q(request, "error")
     return HTMLResponse(content=templating.render(
         "collections/edit.html", active="collections",
-        **viewmodels.collection_edit_vm(collection, message, error)))
+        **viewmodels.collection_edit_vm(collection, message, error, _vocabulary.load_vocabulary())))
 
 
 @router.post("/portal/collections/{collection_id}", response_class=HTMLResponse)
@@ -477,6 +521,8 @@ async def portal_collection_edit(request: Request, collection_id: str, _: str = 
         data["expected_item_count"] = int(form["expected_item_count"])
     try:
         svc.update_collection(collection_id, data, actor="portal")
+        _vocabulary.collect(subject=data.get("subject"), collection_type=data.get("collection_type"),
+                            scope=data.get("scope"))
         return RedirectResponse(url=f"/portal/collections/{collection_id}?message=updated", status_code=303)
     except SamjonMemoryError as e:
         try:
@@ -489,7 +535,8 @@ async def portal_collection_edit(request: Request, collection_id: str, _: str = 
                 **viewmodels.collection_detail_vm(
                     collection, [], {"valid": True, "issues": [], "memory_count": 0},
                     e.message, False,
-                    (svc.list_media("collection", collection_id) if collection else []))),
+                    (svc.list_media("collection", collection_id) if collection else []),
+                    _vocabulary.load_vocabulary())),
             status_code=e.status_code,
         )
 
@@ -515,6 +562,7 @@ async def portal_add_memory_to_collection(collection_id: str, request: Request, 
             pass
     try:
         svc.add_section_to_collection(collection_id, data, actor="portal")
+        _vocabulary.collect(memory_type=data.get("memory_type"))
         return RedirectResponse(url=f"/portal/collections/{collection_id}?message=section_added", status_code=303)
     except SamjonMemoryError as e:
         return RedirectResponse(url=f"/portal/collections/{collection_id}?message=error: {e.message}", status_code=303)

@@ -860,4 +860,44 @@ pre {
   html { scroll-behavior: auto; }
 }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; box-shadow: var(--ring); }
+/* --- Portal vocabulary (collected Subject/Type/Scope words) ----------------- */
+.vocab-count {
+  display: inline-block;
+  min-width: 1.6rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-left: var(--space-2);
+}
+.vocab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+.vocab-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.6rem;
+}
+.vocab-word {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.vocab-remove { display: inline; margin: 0; }
+.vocab-remove .btn { padding: 0.05rem 0.35rem; font-size: 0.72rem; }
+.vocab-add { display: block; margin-top: var(--space-3); }
+.vocab-add textarea { min-height: 2.75rem; }
+.vocab-add .btn { margin-top: var(--space-2); display: block; }
 /* End of Samjon Memory library visual system. */

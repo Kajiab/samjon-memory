@@ -7,6 +7,7 @@
 # EDIT THESE PATHS for your machine before deploying. The following are EXAMPLES
 # only (Windows-style shown; use POSIX paths on Linux):
 #   - "D:/HomeAssistant/samjon-memory/data:/app/data"
+#   - "D:/HomeAssistant/samjon-memory/src:/app/src"
 #   - "D:/HomeAssistant/samjon-memory/category-covers:/app/category-covers:ro"
 #
 # Do not commit real secrets. Provide them via Portainer's stack "Environment
@@ -51,6 +52,9 @@ services:
         source: /absolute/path/to/samjon-memory/category-covers
         target: /app/category-covers
         read_only: true
+      - type: bind
+        source: /absolute/path/to/samjon-memory/src
+        target: /app/src
     healthcheck:
       test:
         - "CMD"

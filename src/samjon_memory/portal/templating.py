@@ -32,6 +32,7 @@ _USER_LINKS = [
 _ADMIN_LINKS = [
     ("admin", "/portal/admin", "Administration"),
     ("audit", "/portal/audit", "Audit"),
+    ("vocabulary", "/portal/vocabulary", "Vocabulary"),
     ("resolver", "/portal/resolver/", "Resolver Debug"),
 ]
 
